@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления веб-сканером</title>
+    <title>Веб-сканер штрихкодов</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,76 +11,32 @@
             color: #333;
             margin: 0;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
+            max-width: 600px;
+            width: 100%;
             background: #fff;
-            padding: 30px;
+            padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        .config-section {
-            background-color: #ecf0f1;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            box-sizing: border-box;
-            background-color: #fff;
-        }
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-            margin-right: 10px;
-            margin-bottom: 5px;
-        }
-        button:hover {
-            background-color: #2980b9;
-        }
-        button.stop-btn {
-            background-color: #e74c3c;
-        }
-        button.stop-btn:hover {
-            background-color: #c0392b;
-        }
-        #video-container {
-            margin: 20px 0;
             text-align: center;
+        }
+        #interactive.viewport {
+            position: relative;
+            width: 100%;
+            height: 300px;
             background: #000;
             border-radius: 6px;
             overflow: hidden;
-            display: none;
+            margin: 20px 0;
         }
-        video {
+        #interactive.viewport video, canvas {
             width: 100%;
-            max-width: 500px;
+            height: 100%;
+            object-fit: cover;
         }
         #output {
             margin-top: 20px;
@@ -88,237 +44,88 @@
             background: #2c3e50;
             color: #ecf0f1;
             border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
             font-family: monospace;
             white-space: pre-wrap;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
             text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
         }
-        th {
+        button {
             background-color: #3498db;
             color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
         }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
+        button:hover {
+            background-color: #2980b9;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1>Панель управления веб-сканером</h1>
+    <h1>Сканер штрихкодов</h1>
+    <button onclick="startScanner()">Включить сканер</button>
     
-    <div class="config-section">
-        <h3>Управление сканером (Камера)</h3>
-        
-        <div class="form-group">
-            <label for="cameraSelect">Выберите камеру телефона:</label>
-            <select id="cameraSelect">
-                <option value="">Определяем доступные камеры...</option>
-            </select>
-        </div>
+    <div id="interactive" class="viewport"></div>
 
-        <button onclick="startCamera()">Включить камеру</button>
-        <button onclick="stopCamera()" class="stop-btn">Выключить камеру</button>
-        
-        <div id="video-container">
-            <video id="webcam" autoplay playsinline></video>
-        </div>
-    </div>
-
-    <div class="config-section">
-        <h3>Интеграция с Google Таблицами</h3>
-        <div class="form-group">
-            <label for="apiKey">API Ключ Google:</label>
-            <input type="text" id="apiKey" placeholder="Вставьте ваш API Ключ">
-        </div>
-        <div class="form-group">
-            <label for="sheetUrl">Ссылка на Google Таблицу:</label>
-            <input type="text" id="sheetUrl" placeholder="Вставьте полную ссылку на таблицу">
-        </div>
-        <button onclick="loadGoogleSheetData()">Загрузить данные таблицы</button>
-    </div>
-
-    <h3>Логи работы сканера / Статус</h3>
-    <div id="output">Приложение готово. Ожидаем разрешения на работу с камерой...</div>
-
-    <div id="tableContainer"></div>
+    <h3>Результат сканирования:</h3>
+    <div id="output">Нажмите кнопку для запуска сканера...</div>
 </div>
 
 <script>
-    let stream = null;
-
-    // Автоматический поиск всех камер при загрузке страницы
-    async function getCameras() {
-        const cameraSelect = document.getElementById('cameraSelect');
+    function startScanner() {
         const outputDiv = document.getElementById('output');
-        
-        try {
-            // Сначала запрашиваем временный доступ, чтобы браузер разрешил прочитать названия камер
-            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            tempStream.getTracks().forEach(track => track.stop()); // сразу закрываем
+        outputDiv.textContent = "Инициализация камеры...";
 
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-            cameraSelect.innerHTML = '';
-
-            if (videoDevices.length === 0) {
-                cameraSelect.innerHTML = '<option value="">Камеры не найдены</option>';
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: {
+                    width: 640,
+                    height: 480,
+                    facingMode: "environment" // Задняя камера
+                },
+            },
+            decoder: {
+                readers: ["ean_reader", "ean_8_reader", "code_128_reader"] // Форматы штрихкодов
+            }
+        }, function (err) {
+            if (err) {
+                console.error(err);
+                outputDiv.textContent = "Ошибка запуска: " + err.message;
                 return;
             }
+            console.log("Initialization finished. Ready to start");
+            Quagga.start();
+            outputDiv.textContent = "Сканер запущен. Наведите камеру на штрихкод.";
+        });
 
-            videoDevices.forEach((device, index) => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                // Если у камеры нет имени, называем её по порядку
-                option.text = device.label || `Камера ${index + 1}`;
-                cameraSelect.appendChild(option);
-            });
-
-            outputDiv.textContent = "Список камер успешно обновлен. Выберите камеру и нажмите 'Включить камеру'.";
-        } catch (error) {
-            outputDiv.textContent = `Не удалось получить список камер: ${error.message}\nПожалуйста, разрешите сайту доступ к камере и обновите страницу.`;
-            outputDiv.style.color = "#e74c3c";
-        }
-    }
-
-    // Запускаем поиск камер сразу при загрузке сайта
-    window.addEventListener('DOMContentLoaded', getCameras);
-
-    // --- ЛОГИКА КАМЕРЫ ---
-    function startCamera() {
-        // Если уже запущена какая-то камера, выключаем её перед сменой
-        if (stream) {
-            stopCamera();
-        }
-
-        const video = document.getElementById('webcam');
-        const container = document.getElementById('video-container');
-        const outputDiv = document.getElementById('output');
-        const selectedDeviceId = document.getElementById('cameraSelect').value;
-
-        outputDiv.textContent = "Запуск выбранной камеры...";
-        outputDiv.style.color = "#ecf0f1";
-
-        // Настройки видео-потока: если есть выбранный ID устройства, берем его
-        const constraints = {
-            video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" }
-        };
-
-        navigator.mediaDevices.getUserMedia(constraints)
-            .then(mediaStream => {
-                stream = mediaStream;
-                video.srcObject = mediaStream;
-                container.style.display = "block";
-                outputDiv.textContent = "Камера успешно запущена.";
-                outputDiv.style.color = "#2ecc71";
-            })
-            .catch(error => {
-                outputDiv.textContent = `Ошибка запуска камеры: ${error.message}`;
-                outputDiv.style.color = "#e74c3c";
-                console.error(error);
-            });
-    }
-
-    function stopCamera() {
-        const video = document.getElementById('webcam');
-        const container = document.getElementById('video-container');
-        const outputDiv = document.getElementById('output');
-
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-            video.srcObject = null;
-            container.style.display = "none";
-            outputDiv.textContent = "Камера выключена.";
-            outputDiv.style.color = "#ecf0f1";
-        }
-    }
-
-    // --- ЛОГИКА GOOGLE ТАБЛИЦ ---
-    function parseGoogleSheetUrl(url) {
-        let spreadsheetId = null;
-        const idMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (idMatch && idMatch[1]) {
-            spreadsheetId = idMatch[1];
-        }
-        return { spreadsheetId };
-    }
-
-    function loadGoogleSheetData() {
-        const apiKey = document.getElementById('apiKey').value.trim();
-        const sheetUrl = document.getElementById('sheetUrl').value.trim();
-        const outputDiv = document.getElementById('output');
-        const tableContainer = document.getElementById('tableContainer');
-
-        if (!apiKey || !sheetUrl) {
-            outputDiv.textContent = "Ошибка: Пожалуйста, заполните API Ключ и вставьте ссылку на таблицу.";
-            outputDiv.style.color = "#e74c3c";
-            return;
-        }
-
-        const parsed = parseGoogleSheetUrl(sheetUrl);
-        
-        if (!parsed.spreadsheetId) {
-            outputDiv.textContent = "Ошибка: Не удалось распознать ID таблицы в ссылке.";
-            outputDiv.style.color = "#e74c3c";
-            return;
-        }
-
-        outputDiv.textContent = "Соединение с Google API и загрузка данных...";
-        outputDiv.style.color = "#ecf0f1";
-        tableContainer.innerHTML = "";
-
-        const range = "A1:Z100";
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${parsed.spreadsheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
-
-        fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Ошибка запроса. Код статуса: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.values || data.values.length === 0) {
-                    outputDiv.textContent = "Данные не найдены на первом листе таблицы.";
-                    return;
-                }
-
-                outputDiv.textContent = `Успешно загружено строк из таблицы: ${data.values.length}`;
-                outputDiv.style.color = "#2ecc71";
-
-                let tableHtml = '<table>';
-                data.values.forEach((row, index) => {
-                    tableHtml += '<tr>';
-                    row.forEach(cell => {
-                        if (index === 0) {
-                            tableHtml += `<th>${cell}</th>`;
-                        } else {
-                            tableHtml += `<td>${cell}</td>`;
-                        }
-                    });
-                    tableHtml += '</tr>';
-                });
-                tableHtml += '</table>';
-                
-                tableContainer.innerHTML = tableHtml;
-            })
-            .catch(error => {
-                outputDiv.textContent = `Ошибка при чтении таблицы: \n${error.message}\n\nПроверьте: \n1. Правильность API-ключа.\n2. Открыт ли доступ к таблице ("Все, у кого есть ссылка" в режиме Читатель).`;
-                outputDiv.style.color = "#e74c3c";
-                console.error(error);
-            });
+        // Логика обработки распознанного штрихкода из вашего коммита
+        Quagga.onDetected(function (data) {
+            const code = data.codeResult.code;
+            document.getElementById('output').textContent = "Распознан код: " + code;
+            
+            // Проверка условий из оригинального скрипта
+            if (code.startsWith("460")) {
+                alert("Это Молоко Домик в деревне!");
+            } else if (code.startsWith("467")) {
+                alert("Это Сыр Ламбер!");
+            } else if (code === "4600605021571") {
+                alert("Это Шоколад Аленка!");
+            } else if (code === "4640001150111") {
+                alert("Это Сок Добрый Яблоко!");
+            } else {
+                console.log("Неизвестный штрихкод: " + code);
+            }
+        });
     }
 </script>
 
