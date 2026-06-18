@@ -3,132 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Сканер таблиц</title>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-        video { width: 100%; max-height: 300px; background: #000; border-radius: 8px; margin-bottom: 10px; }
-        button, input { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; font-size: 16px; }
-        button { background-color: #007BFF; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:disabled { background-color: #ccc; }
-        #results { margin-top: 20px; padding: 10px; background: #f4f4f4; border-radius: 5px; min-height: 50px; }
-        canvas { display: none; }
-        .match { color: green; font-weight: bold; }
-        .no-match { color: red; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-    <h2>Сканер и поиск по таблице</h2>
-
-    <label><b>1. Загрузите таблицу (Excel/CSV):</b></label>
-    <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" />
-    <div id="tableStatus">Таблица не загружена</div>
-
-    <hr>
-
-    <label><b>2. Наведите камеру на цифры:</b></label>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    
-    <button id="scanBtn" disabled>Сканировать и найти</button>
-    
-    <div id="results">Здесь будут результаты поиска...</div>
-
-    <script>
-        let tableData = []; // Сюда сохраним данные из таблицы
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const scanBtn = document.getElementById('scanBtn');
-        const resultsDiv = document.getElementById('results');
-
-        // --- 1. ЧТЕНИЕ ТАБЛИЦЫ ---
-        document.getElementById('fileUpload').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                // Берем первый лист
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                // Превращаем в массив массивов (удобно для поиска)
-                tableData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-                document.getElementById('tableStatus').innerText = `✅ Загружено строк: ${tableData.length}`;
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        // --- 2. ВКЛЮЧЕНИЕ КАМЕРЫ ---
-        async function startCamera() {
-            try {
-                // Пытаемся включить заднюю камеру
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                video.srcObject = stream;
-                scanBtn.disabled = false;
-            } catch (err) {
-                resultsDiv.innerHTML = `<span class="no-match">Ошибка камеры: ${err.message}</span>`;
-            }
-        }
-        startCamera();
-
-        // --- 3. СКАНИРОВАНИЕ И ПОИСК ---
-        scanBtn.addEventListener('click', async () => {
-            if (tableData.length === 0) {
-                alert("Сначала загрузите таблицу!");
-                return;
-            }
-
-            // Ставим картинку с видео на холст (canvas)
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            scanBtn.disabled = true;
-            resultsDiv.innerHTML = "Распознавание... ⏳ (может занять пару секунд)";
-
-            // Получаем картинку в формате base64
-            const imageData = canvas.toDataURL('image/png');
-
-            try {
-                // Запускаем Tesseract. Ограничиваем только цифрами для скорости и точности
-                const result = await Tesseract.recognize(
-                    imageData,
-                    'eng',
-                    { logger: m => console.log(m) }
-                );
-
-                // Очищаем результат от пробелов и лишних символов
-                const text = result.data.text.replace(/\D/g, ''); 
-
-                if (!text) {
-                    resultsDiv.innerHTML = `<span class="no-match">Цифры не найдены на фото. Попробуйте еще раз.</span>`;
-                } else {
-                    searchInTable(text);
-                }
-
-            } catch (err) {
-                resultsDiv.innerHTML = `<span class="no-match">Ошибка распознавания: ${err.message}</span>`;
-            } finally {
-                scanBtn.disabled = false;
-            }
-        });
-
-        // --- 4. ЛОГИКА ПОИСКА ---
-        function searchInTable(searchText) {
-            let foundMatches = [];
-
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления веб-сканером</title>
+    <title>Веб-сканер штрихкодов</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -136,235 +11,32 @@
             color: #333;
             margin: 0;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
+            max-width: 600px;
+            width: 100%;
             background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        .config-section {
-            background-color: #ecf0f1;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background-color: #2980b9;
-        }
-        #output {
-            margin-top: 20px;
-            padding: 15px;
-            background: #2c3e50;
-            color: #ecf0f1;
-            border-radius: 4px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: monospace;
-            white-space: pre-wrap;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #3498db;
-            color: white;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>Панель управления веб-сканером</h1>
-    
-    <div class="config-section">
-        <h3>Интеграция с Google Таблицами</h3>
-        <div class="form-group">
-            <label for="apiKey">API Ключ Google:</label>
-            <input type="text" id="apiKey" placeholder="Вставьте ваш API Ключ">
-        </div>
-        <div class="form-group">
-            <label for="sheetUrl">Ссылка на Google Таблицу:</label>
-            <input type="text" id="sheetUrl" placeholder="Вставьте полную ссылку на таблицу">
-        </div>
-        <button onclick="loadGoogleSheetData()">Загрузить данные таблицы</button>
-    </div>
-
-    <h3>Логи работы сканера / Статус</h3>
-    <div id="output">Готов к работе. Вставьте данные выше, чтобы загрузить таблицу.</div>
-
-    <div id="tableContainer"></div>
-</div>
-
-<script>
-    // Функция автоматического извлечения ID таблицы из ссылки
-    function parseGoogleSheetUrl(url) {
-        let spreadsheetId = null;
-        const idMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (idMatch && idMatch[1]) {
-            spreadsheetId = idMatch[1];
-        }
-        return { spreadsheetId };
-    }
-
-    // Функция для чтения данных из Google Таблиц
-    function loadGoogleSheetData() {
-        const apiKey = document.getElementById('apiKey').value.trim();
-        const sheetUrl = document.getElementById('sheetUrl').value.trim();
-        const outputDiv = document.getElementById('output');
-        const tableContainer = document.getElementById('tableContainer');
-
-        if (!apiKey || !sheetUrl) {
-            outputDiv.textContent = "Ошибка: Пожалуйста, заполните API Ключ и вставьте ссылку на таблицу.";
-            outputDiv.style.color = "#e74c3c";
-            return;
-        }
-
-        const parsed = parseGoogleSheetUrl(sheetUrl);
-        
-        if (!parsed.spreadsheetId) {
-            outputDiv.textContent = "Ошибка: Не удалось распознать ID таблицы в ссылке. Проверьте её корректность.";
-            outputDiv.style.color = "#e74c3c";
-            return;
-        }
-
-        outputDiv.textContent = "Соединение с Google API и загрузка данных...";
-        outputDiv.style.color = "#ecf0f1";
-        tableContainer.innerHTML = "";
-
-        // Читаем первые 100 строк по умолчанию
-        const range = "A1:Z100";
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${parsed.spreadsheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
-
-        fetch(url)
-            .then(response => {
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления веб-сканером</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            color: #333;
-            margin: 0;
             padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 30px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        .config-section {
-            background-color: #ecf0f1;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        input[type="text"], select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #bdc3c7;
-            border-radius: 4px;
-            box-sizing: border-box;
-            background-color: #fff;
-        }
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s;
-            margin-right: 10px;
-            margin-bottom: 5px;
-        }
-        button:hover {
-            background-color: #2980b9;
-        }
-        button.stop-btn {
-            background-color: #e74c3c;
-        }
-        button.stop-btn:hover {
-            background-color: #c0392b;
-        }
-        #video-container {
-            margin: 20px 0;
             text-align: center;
+        }
+        #interactive.viewport {
+            position: relative;
+            width: 100%;
+            height: 300px;
             background: #000;
             border-radius: 6px;
             overflow: hidden;
-            display: none;
+            margin: 20px 0;
         }
-        video {
+        #interactive.viewport video, canvas {
             width: 100%;
-            max-width: 500px;
+            height: 100%;
+            object-fit: cover;
         }
         #output {
             margin-top: 20px;
@@ -372,55 +44,90 @@
             background: #2c3e50;
             color: #ecf0f1;
             border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
             font-family: monospace;
             white-space: pre-wrap;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
             text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
         }
-        th {
+        button {
             background-color: #3498db;
             color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
         }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
+        button:hover {
+            background-color: #2980b9;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1>Панель управления веб-сканером</h1>
+    <h1>Сканер штрихкодов</h1>
+    <button onclick="startScanner()">Включить сканер</button>
     
-    <div class="config-section">
-        <h3>Управление сканером (Камера)</h3>
-        
-        <div class="form-group">
-            <label for="cameraSelect">Выберите камеру телефона:</label>
-            <select id="cameraSelect">
-                <option value="">Определяем доступные камеры...</option>
-            </select>
-        </div>
+    <div id="interactive" class="viewport"></div>
 
-        <button onclick="startCamera()">Включить камеру</button>
-        <button onclick="stopCamera()" class="stop-btn">Выключить камеру</button>
-        
-        <div id="video-container">
-            <video id="webcam" autoplay playsinline></video>
-        </div>
-    </div>
+    <h3>Результат сканирования:</h3>
+    <div id="output">Нажмите кнопку для запуска сканера...</div>
+</div>
 
-    <div class="config-section">
-        <h3>Интеграция с Google Таблицами</h3>
-        <div class="form-group">
-            <label for="apiKey">API Ключ Google:</label>
-            <input type="text" id="apiKey" placeholder
+<script>
+    function startScanner() {
+        const outputDiv = document.getElementById('output');
+        outputDiv.textContent = "Инициализация камеры...";
+
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: {
+                    width: 640,
+                    height: 480,
+                    facingMode: "environment" // Задняя камера
+                },
+            },
+            decoder: {
+                readers: ["ean_reader", "ean_8_reader", "code_128_reader"] // Форматы штрихкодов
+            }
+        }, function (err) {
+            if (err) {
+                console.error(err);
+                outputDiv.textContent = "Ошибка запуска: " + err.message;
+                return;
+            }
+            console.log("Initialization finished. Ready to start");
+            Quagga.start();
+            outputDiv.textContent = "Сканер запущен. Наведите камеру на штрихкод.";
+        });
+
+        // Логика обработки распознанного штрихкода из вашего коммита
+        Quagga.onDetected(function (data) {
+            const code = data.codeResult.code;
+            document.getElementById('output').textContent = "Распознан код: " + code;
+            
+            // Проверка условий из оригинального скрипта
+            if (code.startsWith("460")) {
+                alert("Это Молоко Домик в деревне!");
+            } else if (code.startsWith("467")) {
+                alert("Это Сыр Ламбер!");
+            } else if (code === "4600605021571") {
+                alert("Это Шоколад Аленка!");
+            } else if (code === "4640001150111") {
+                alert("Это Сок Добрый Яблоко!");
+            } else {
+                console.log("Неизвестный штрихкод: " + code);
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
