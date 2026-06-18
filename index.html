@@ -282,44 +282,145 @@
 
         fetch(url)
             .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Ошибка запроса. Код статуса: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.values || data.values.length === 0) {
-                    outputDiv.textContent = "Данные не найдены на первом листе таблицы.";
-                    return;
-                }
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления веб-сканером</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .config-section {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: #fff;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.stop-btn {
+            background-color: #e74c3c;
+        }
+        button.stop-btn:hover {
+            background-color: #c0392b;
+        }
+        #video-container {
+            margin: 20px 0;
+            text-align: center;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            display: none;
+        }
+        video {
+            width: 100%;
+            max-width: 500px;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
 
-                outputDiv.textContent = `Успешно загружено строк: ${data.values.length}`;
-                outputDiv.style.color = "#2ecc71";
+<div class="container">
+    <h1>Панель управления веб-сканером</h1>
+    
+    <div class="config-section">
+        <h3>Управление сканером (Камера)</h3>
+        
+        <div class="form-group">
+            <label for="cameraSelect">Выберите камеру телефона:</label>
+            <select id="cameraSelect">
+                <option value="">Определяем доступные камеры...</option>
+            </select>
+        </div>
 
-                // Рендеринг HTML таблицы
-                let tableHtml = '<table>';
-                data.values.forEach((row, index) => {
-                    tableHtml += '<tr>';
-                    row.forEach(cell => {
-                        if (index === 0) {
-                            tableHtml += `<th>${cell}</th>`;
-                        } else {
-                            tableHtml += `<td>${cell}</td>`;
-                        }
-                    });
-                    tableHtml += '</tr>';
-                });
-                tableHtml += '</table>';
-                
-                tableContainer.innerHTML = tableHtml;
-            })
-            .catch(error => {
-                outputDiv.textContent = `Ошибка при чтении таблицы: \n${error.message}\n\nПроверьте: \n1. Правильность API-ключа.\n2. Открыт ли доступ к таблице ("Все, у кого есть ссылка" в режиме Читатель).`;
-                outputDiv.style.color = "#e74c3c";
-                console.error(error);
-            });
-    }
-</script>
+        <button onclick="startCamera()">Включить камеру</button>
+        <button onclick="stopCamera()" class="stop-btn">Выключить камеру</button>
+        
+        <div id="video-container">
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+    </div>
 
-</body>
-</html>
+    <div class="config-section">
+        <h3>Интеграция с Google Таблицами</h3>
+        <div class="form-group">
+            <label for="apiKey">API Ключ Google:</label>
+            <input type="text" id="apiKey" placeholder
