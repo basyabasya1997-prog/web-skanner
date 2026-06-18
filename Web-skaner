@@ -3,119 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Сканер таблиц</title>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-        video { width: 100%; max-height: 300px; background: #000; border-radius: 8px; margin-bottom: 10px; }
-        button, input { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; font-size: 16px; }
-        button { background-color: #007BFF; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:disabled { background-color: #ccc; }
-        #results { margin-top: 20px; padding: 10px; background: #f4f4f4; border-radius: 5px; min-height: 50px; }
-        canvas { display: none; }
-        .match { color: green; font-weight: bold; }
-        .no-match { color: red; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-    <h2>Сканер и поиск по таблице</h2>
-
-    <label><b>1. Загрузите таблицу (Excel/CSV):</b></label>
-    <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" />
-    <div id="tableStatus">Таблица не загружена</div>
-
-    <hr>
-
-    <label><b>2. Наведите камеру на цифры:</b></label>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
-    
-    <button id="scanBtn" disabled>Сканировать и найти</button>
-    
-    <div id="results">Здесь будут результаты поиска...</div>
-
-    <script>
-        let tableData = []; // Сюда сохраним данные из таблицы
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const scanBtn = document.getElementById('scanBtn');
-        const resultsDiv = document.getElementById('results');
-
-        // --- 1. ЧТЕНИЕ ТАБЛИЦЫ ---
-        document.getElementById('fileUpload').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                // Берем первый лист
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                // Превращаем в массив массивов (удобно для поиска)
-                tableData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-                document.getElementById('tableStatus').innerText = `✅ Загружено строк: ${tableData.length}`;
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        // --- 2. ВКЛЮЧЕНИЕ КАМЕРЫ ---
-        async function startCamera() {
-            try {
-                // Пытаемся включить заднюю камеру
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                video.srcObject = stream;
-                scanBtn.disabled = false;
-            } catch (err) {
-                resultsDiv.innerHTML = `<span class="no-match">Ошибка камеры: ${err.message}</span>`;
-            }
-        }
-        startCamera();
-
-        // --- 3. СКАНИРОВАНИЕ И ПОИСК ---
-        scanBtn.addEventListener('click', async () => {
-            if (tableData.length === 0) {
-                alert("Сначала загрузите таблицу!");
-                return;
-            }
-
-            // Ставим картинку с видео на холст (canvas)
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            scanBtn.disabled = true;
-            resultsDiv.innerHTML = "Распознавание... ⏳ (может занять пару секунд)";
-
-            // Получаем картинку в формате base64
-            const imageData = canvas.toDataURL('image/png');
-
-            try {
-                // Запускаем Tesseract. Ограничиваем только цифрами для скорости и точности
-                const result = await Tesseract.recognize(
-                    imageData,
-                    'eng',
-                    { logger: m => console.log(m) }
-                );
-
-                // Очищаем результат от пробелов и лишних символов
-                const text = result.data.text.replace(/\D/g, ''); 
-
-                if (!text) {
-                    resultsDiv.innerHTML = `<span class="no-match">Цифры не найдены на фото. Попробуйте еще раз.</span>`;
-                } else {
-                    searchInTable(text);
-                }
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель управления веб-сканером</title>
     <style>
         body {
@@ -154,12 +41,13 @@
             font-weight: bold;
             margin-bottom: 5px;
         }
-        input[type="text"] {
+        input[type="text"], select {
             width: 100%;
             padding: 10px;
             border: 1px solid #bdc3c7;
             border-radius: 4px;
             box-sizing: border-box;
+            background-color: #fff;
         }
         button {
             background-color: #3498db;
@@ -170,9 +58,29 @@
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.3s;
+            margin-right: 10px;
+            margin-bottom: 5px;
         }
         button:hover {
             background-color: #2980b9;
+        }
+        button.stop-btn {
+            background-color: #e74c3c;
+        }
+        button.stop-btn:hover {
+            background-color: #c0392b;
+        }
+        #video-container {
+            margin: 20px 0;
+            text-align: center;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            display: none;
+        }
+        video {
+            width: 100%;
+            max-width: 500px;
         }
         #output {
             margin-top: 20px;
@@ -180,7 +88,7 @@
             background: #2c3e50;
             color: #ecf0f1;
             border-radius: 4px;
-            max-height: 300px;
+            max-height: 200px;
             overflow-y: auto;
             font-family: monospace;
             white-space: pre-wrap;
@@ -210,6 +118,24 @@
     <h1>Панель управления веб-сканером</h1>
     
     <div class="config-section">
+        <h3>Управление сканером (Камера)</h3>
+        
+        <div class="form-group">
+            <label for="cameraSelect">Выберите камеру телефона:</label>
+            <select id="cameraSelect">
+                <option value="">Определяем доступные камеры...</option>
+            </select>
+        </div>
+
+        <button onclick="startCamera()">Включить камеру</button>
+        <button onclick="stopCamera()" class="stop-btn">Выключить камеру</button>
+        
+        <div id="video-container">
+            <video id="webcam" autoplay playsinline></video>
+        </div>
+    </div>
+
+    <div class="config-section">
         <h3>Интеграция с Google Таблицами</h3>
         <div class="form-group">
             <label for="apiKey">API Ключ Google:</label>
@@ -223,12 +149,103 @@
     </div>
 
     <h3>Логи работы сканера / Статус</h3>
-    <div id="output">Готов к работе. Вставьте данные выше, чтобы загрузить таблицу.</div>
+    <div id="output">Приложение готово. Ожидаем разрешения на работу с камерой...</div>
 
     <div id="tableContainer"></div>
 </div>
 
 <script>
+    let stream = null;
+
+    // Автоматический поиск всех камер при загрузке страницы
+    async function getCameras() {
+        const cameraSelect = document.getElementById('cameraSelect');
+        const outputDiv = document.getElementById('output');
+        
+        try {
+            // Сначала запрашиваем временный доступ, чтобы браузер разрешил прочитать названия камер
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            tempStream.getTracks().forEach(track => track.stop()); // сразу закрываем
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            cameraSelect.innerHTML = '';
+
+            if (videoDevices.length === 0) {
+                cameraSelect.innerHTML = '<option value="">Камеры не найдены</option>';
+                return;
+            }
+
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                // Если у камеры нет имени, называем её по порядку
+                option.text = device.label || `Камера ${index + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            outputDiv.textContent = "Список камер успешно обновлен. Выберите камеру и нажмите 'Включить камеру'.";
+        } catch (error) {
+            outputDiv.textContent = `Не удалось получить список камер: ${error.message}\nПожалуйста, разрешите сайту доступ к камере и обновите страницу.`;
+            outputDiv.style.color = "#e74c3c";
+        }
+    }
+
+    // Запускаем поиск камер сразу при загрузке сайта
+    window.addEventListener('DOMContentLoaded', getCameras);
+
+    // --- ЛОГИКА КАМЕРЫ ---
+    function startCamera() {
+        // Если уже запущена какая-то камера, выключаем её перед сменой
+        if (stream) {
+            stopCamera();
+        }
+
+        const video = document.getElementById('webcam');
+        const container = document.getElementById('video-container');
+        const outputDiv = document.getElementById('output');
+        const selectedDeviceId = document.getElementById('cameraSelect').value;
+
+        outputDiv.textContent = "Запуск выбранной камеры...";
+        outputDiv.style.color = "#ecf0f1";
+
+        // Настройки видео-потока: если есть выбранный ID устройства, берем его
+        const constraints = {
+            video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" }
+        };
+
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(mediaStream => {
+                stream = mediaStream;
+                video.srcObject = mediaStream;
+                container.style.display = "block";
+                outputDiv.textContent = "Камера успешно запущена.";
+                outputDiv.style.color = "#2ecc71";
+            })
+            .catch(error => {
+                outputDiv.textContent = `Ошибка запуска камеры: ${error.message}`;
+                outputDiv.style.color = "#e74c3c";
+                console.error(error);
+            });
+    }
+
+    function stopCamera() {
+        const video = document.getElementById('webcam');
+        const container = document.getElementById('video-container');
+        const outputDiv = document.getElementById('output');
+
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+            video.srcObject = null;
+            container.style.display = "none";
+            outputDiv.textContent = "Камера выключена.";
+            outputDiv.style.color = "#ecf0f1";
+        }
+    }
+
+    // --- ЛОГИКА GOOGLE ТАБЛИЦ ---
     function parseGoogleSheetUrl(url) {
         let spreadsheetId = null;
         const idMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
@@ -253,7 +270,7 @@
         const parsed = parseGoogleSheetUrl(sheetUrl);
         
         if (!parsed.spreadsheetId) {
-            outputDiv.textContent = "Ошибка: Не удалось распознать ID таблицы в ссылке. Проверьте её корректность.";
+            outputDiv.textContent = "Ошибка: Не удалось распознать ID таблицы в ссылке.";
             outputDiv.style.color = "#e74c3c";
             return;
         }
@@ -278,7 +295,7 @@
                     return;
                 }
 
-                outputDiv.textContent = `Успешно загружено строк: ${data.values.length}`;
+                outputDiv.textContent = `Успешно загружено строк из таблицы: ${data.values.length}`;
                 outputDiv.style.color = "#2ecc71";
 
                 let tableHtml = '<table>';
