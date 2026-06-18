@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сканер таблиц</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+        video { width: 100%; max-height: 300px; background: #000; border-radius: 8px; margin-bottom: 10px; }
+        button, input { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; font-size: 16px; }
+        button { background-color: #007BFF; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:disabled { background-color: #ccc; }
+        #results { margin-top: 20px; padding: 10px; background: #f4f4f4; border-radius: 5px; min-height: 50px; }
+        canvas { display: none; }
+        .match { color: green; font-weight: bold; }
+        .no-match { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>Сканер и поиск по таблице</h2>
+
+    <label><b>1. Загрузите таблицу (Excel/CSV):</b></label>
+    <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" />
+    <div id="tableStatus">Таблица не загружена</div>
+
+    <hr>
+
+    <label><b>2. Наведите камеру на цифры:</b></label>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    
+    <button id="scanBtn" disabled>Сканировать и найти</button>
+    
+    <div id="results">Здесь будут результаты поиска...</div>
+
+    <script>
+        let tableData = []; // Сюда сохраним данные из таблицы
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scanBtn = document.getElementById('scanBtn');
+        const resultsDiv = document.getElementById('results');
+
+        // --- 1. ЧТЕНИЕ ТАБЛИЦЫ ---
+        document.getElementById('fileUpload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                // Берем первый лист
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                // Превращаем в массив массивов (удобно для поиска)
+                tableData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                document.getElementById('tableStatus').innerText = `✅ Загружено строк: ${tableData.length}`;
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // --- 2. ВКЛЮЧЕНИЕ КАМЕРЫ ---
+        async function startCamera() {
+            try {
+                // Пытаемся включить заднюю камеру
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                video.srcObject = stream;
+                scanBtn.disabled = false;
+            } catch (err) {
+                resultsDiv.innerHTML = `<span class="no-match">Ошибка камеры: ${err.message}</span>`;
+            }
+        }
+        startCamera();
+
+        // --- 3. СКАНИРОВАНИЕ И ПОИСК ---
+        scanBtn.addEventListener('click', async () => {
+            if (tableData.length === 0) {
+                alert("Сначала загрузите таблицу!");
+                return;
+            }
+
+            // Ставим картинку с видео на холст (canvas)
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            scanBtn.disabled = true;
+            resultsDiv.innerHTML = "Распознавание... ⏳ (может занять пару секунд)";
+
+            // Получаем картинку в формате base64
+            const imageData = canvas.toDataURL('image/png');
+
+            try {
+                // Запускаем Tesseract. Ограничиваем только цифрами для скорости и точности
+                const result = await Tesseract.recognize(
+                    imageData,
+                    'eng',
+                    { logger: m => console.log(m) }
+                );
+
+                // Очищаем результат от пробелов и лишних символов
+                const text = result.data.text.replace(/\D/g, ''); 
+
+                if (!text) {
+                    resultsDiv.innerHTML = `<span class="no-match">Цифры не найдены на фото. Попробуйте еще раз.</span>`;
+                } else {
+                    searchInTable(text);
+                }
+
+            } catch (err) {
+                resultsDiv.innerHTML = `<span class="no-match">Ошибка распознавания: ${err.message}</span>`;
+            } finally {
+                scanBtn.disabled = false;
+            }
+        });
+
+        // --- 4. ЛОГИКА ПОИСКА ---
+        function searchInTable(searchText) {
+            let foundMatches = [];
+
+            // Проходимся по каждой строке и каждой ячейке
+            tableData.forEach((row, rowIndex) => {
+                row.forEach((cell) => {
+                    if (String(cell).includes(searchText)) {
+                        foundMatches.push(`Строка ${rowIndex + 1}: ${row.join(', ')}`);
+                    }
+                });
+            });
+
+            if (foundMatches.length > 0) {
+                resultsDiv.innerHTML = `<p class="match">Найдено совпадение для "${searchText}":</p>` + 
+                                       `<ul><li>` + foundMatches.join('</li><li>') + `</li></ul>`;
+            } else {
+                resultsDiv.innerHTML = `<p class="no-match">Цифры "${searchText}" не найдены в таблице.</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
