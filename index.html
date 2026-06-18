@@ -23,8 +23,9 @@
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             text-align: center;
+            box-sizing: border-box;
         }
-        #interactive.viewport {
+        #viewport-container {
             position: relative;
             width: 100%;
             height: 300px;
@@ -33,266 +34,176 @@
             overflow: hidden;
             margin: 20px 0;
         }
-        #interactive.viewport video, canvas {
+        video, canvas {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        #output {
-            margin-top: 20px;
-            padding: 15px;
-            background: #2c3e50;
-            color: #ecf0f1;
-            border-radius: 4px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            text-align: left;
-            max-height: 150px;
-            overflow-y: auto;
+        canvas {
+            display: none;
         }
-        .table-manager {
-            margin: 15px 0;
-            text-align: left;
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 6px;
-        }
-        .table-manager input {
-            width: 80%;
-            padding: 8px;
-            margin-right: 5px;
-        }
-        .table-list {
-            list-style: none;
-            padding: 0;
-        }
-        .table-list li {
-            background: #e9ecef;
-            margin: 4px 0;
-            padding: 6px 10px;
-            border-radius: 4px;
+        .form-group {
+            margin-bottom: 15px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            word-break: break-all;
+            gap: 10px;
         }
-        .table-list li button {
-            background: #e74c3c;
-            border: none;
-            color: white;
-            padding: 4px 8px;
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
             border-radius: 4px;
-            cursor: pointer;
+            font-size: 16px;
         }
         button {
-            background-color: #3498db;
+            padding: 10px 20px;
+            background: #28a745;
             color: white;
             border: none;
-            padding: 12px 24px;
-            font-size: 16px;
             border-radius: 4px;
             cursor: pointer;
-            margin: 5px;
-            transition: background 0.3s;
+            font-size: 16px;
+            font-weight: bold;
         }
         button:hover {
-            background-color: #2980b9;
+            background: #218838;
         }
-        .camera-select {
+        button.secondary {
+            background: #007bff;
+        }
+        button.secondary:hover {
+            background: #0069d9;
+        }
+        #status {
             margin: 10px 0;
+            color: #666;
+            font-style: italic;
+        }
+        #results {
+            margin-top: 20px;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #28a745;
+            display: none;
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1>Сканер + Google Таблицы</h1>
-
-    <!-- Управление таблицами -->
-    <div class="table-manager">
-        <h4>📋 Google Таблицы (CSV)</h4>
-        <input type="text" id="tableUrlInput" placeholder="Вставьте URL опубликованной CSV-таблицы">
-        <button id="addTableBtn">➕ Добавить</button>
-        <ul id="tableList" class="table-list"></ul>
-        <small>Данные загружаются автоматически при добавлении и хранятся локально.</small>
+    <h2>Сканер текста и поиск</h2>
+    
+    <div id="viewport-container">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
     </div>
 
-    <!-- Выбор камеры -->
-    <div class="camera-select">
-        <button id="toggleCamera">📷 Переключить камеру</button>
+    <button class="secondary" id="snap-btn">Распознать с камеры</button>
+
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+    <div class="form-group">
+        <input type="text" id="search-input" placeholder="Введите текст для поиска вручную...">
+        <button id="search-btn">Искать</button>
     </div>
 
-    <!-- Сканер -->
-    <button id="startScannerBtn">▶️ Включить сканер</button>
-    <div id="interactive" class="viewport"></div>
-
-    <h3>Результат:</h3>
-    <div id="output">Ожидание сканирования...</div>
+    <div id="status">Запуск камеры...</div>
+    <div id="results"></div>
 </div>
 
 <script>
-    // Состояния
-    let quaggaInitialized = false;
-    let currentFacingMode = "environment"; // задняя по умолчанию
-    let tables = []; // массив URL таблиц
-    let tableData = {}; // объект: ключ – штрихкод, значение – массив ячеек строки
+    // URL вашего развернутого Web App из Google Apps Script
+    const WEB_APP_URL = 'УКАЖИТЕ_ЗДЕСЬ_ВАШ_URL_ПОСЛЕ_НАСТРОЙКИ';
 
-    // DOM элементы
-    const outputDiv = document.getElementById('output');
-    const tableUrlInput = document.getElementById('tableUrlInput');
-    const addTableBtn = document.getElementById('addTableBtn');
-    const tableListEl = document.getElementById('tableList');
-    const toggleCameraBtn = document.getElementById('toggleCamera');
-    const startScannerBtn = document.getElementById('startScannerBtn');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const snapBtn = document.getElementById('snap-btn');
+    const searchInput = document.getElementById('search-input');
+    const searchBtn = document.getElementById('search-btn');
+    const statusDiv = document.getElementById('status');
+    const resultsDiv = document.getElementById('results');
 
-    // Загружаем сохранённые таблицы из localStorage
-    function loadTablesFromStorage() {
-        const stored = localStorage.getItem('webScannerTables');
-        if (stored) {
-            tables = JSON.parse(stored);
-        }
-        renderTableList();
-        reloadAllTablesData(); // перезагрузить данные из всех таблиц
-    }
-
-    // Сохраняем список таблиц
-    function saveTablesToStorage() {
-        localStorage.setItem('webScannerTables', JSON.stringify(tables));
-    }
-
-    // Отображение списка таблиц
-    function renderTableList() {
-        tableListEl.innerHTML = '';
-        tables.forEach((url, index) => {
-            const li = document.createElement('li');
-            li.textContent = url;
-            const removeBtn = document.createElement('button');
-            removeBtn.textContent = '❌';
-            removeBtn.onclick = () => {
-                tables.splice(index, 1);
-                saveTablesToStorage();
-                renderTableList();
-                reloadAllTablesData();
-            };
-            li.appendChild(removeBtn);
-            tableListEl.appendChild(li);
-        });
-    }
-
-    // Загрузка CSV из URL и парсинг
-    async function fetchTableCSV(url) {
-        const response = await fetch(url);
-        const text = await response.text();
-        const rows = text.trim().split('\n');
-        const data = {};
-        rows.forEach(row => {
-            // Простой парсинг CSV (без экранирования кавычек – для простых данных)
-            const cols = row.split(',').map(cell => cell.trim());
-            if (cols.length > 0) {
-                const barcode = cols[0]; // первый столбец – штрихкод
-                data[barcode] = cols;    // сохраняем всю строку
-            }
-        });
-        return data;
-    }
-
-    // Объединяем данные из всех таблиц (приоритет последней добавленной)
-    async function reloadAllTablesData() {
-        tableData = {};
-        for (const url of tables) {
-            try {
-                const newData = await fetchTableCSV(url);
-                Object.assign(tableData, newData); // перезаписываем дубликаты последними
-            } catch (error) {
-                console.error('Ошибка загрузки таблицы:', url, error);
-            }
-        }
-        outputDiv.textContent = `Загружено таблиц: ${tables.length}. Штрихкодов в базе: ${Object.keys(tableData).length}`;
-    }
-
-    // Добавление новой таблицы
-    addTableBtn.addEventListener('click', () => {
-        const url = tableUrlInput.value.trim();
-        if (!url) return;
-        if (!tables.includes(url)) {
-            tables.push(url);
-            saveTablesToStorage();
-            renderTableList();
-            reloadAllTablesData();
-        }
-        tableUrlInput.value = '';
-    });
-
-    // Остановка Quagga, если запущен
-    function stopQuagga() {
-        if (quaggaInitialized) {
-            Quagga.stop();
-            quaggaInitialized = false;
-        }
-    }
-
-    // Запуск/перезапуск сканера с заданной камерой
-    function startScanner() {
-        stopQuagga();
-        outputDiv.textContent = "Инициализация камеры...";
-
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.querySelector('#interactive'),
-                constraints: {
-                    width: 640,
-                    height: 480,
-                    facingMode: currentFacingMode
-                }
-            },
-            decoder: {
-                readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-            }
-        }, function (err) {
-            if (err) {
-                console.error(err);
-                outputDiv.textContent = "Ошибка запуска: " + err.message;
-                return;
-            }
-            quaggaInitialized = true;
-            Quagga.start();
-            outputDiv.textContent = "Сканер запущен. Наведите на штрихкод.";
+    // 1. Инициализация камеры
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+            video.srcObject = stream;
+            statusDiv.textContent = 'Камера готова. Наведите на текст и нажмите кнопку.';
+        })
+        .catch(err => {
+            console.error("Ошибка камеры: ", err);
+            statusDiv.textContent = 'Не удалось получить доступ к камере. Используйте ручной ввод.';
         });
 
-        // Обработка распознавания
-        Quagga.onDetected(function (data) {
-            const code = data.codeResult.code;
-            outputDiv.textContent = `Распознан код: ${code}`;
+    // 2. Логика сканирования и распознавания текста (OCR)
+    snapBtn.addEventListener('click', async () => {
+        statusDiv.textContent = 'Делаем снимок и распознаем текст... (это может занять 3-5 сек)';
+        
+        // Рисуем текущий кадр видео на скрытый canvas
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Поиск в загруженных данных таблиц
-            if (tableData[code]) {
-                const row = tableData[code];
-                // выводим всю строку, кроме первого столбца (штрихкода)
-                const info = row.slice(1).join(', ');
-                outputDiv.textContent = `✅ Найдено: ${info}`;
-                // Можно добавить звуковой сигнал или вибрацию
+        try {
+            // Запускаем Tesseract (поддерживает русский и английский)
+            const result = await Tesseract.recognize(canvas, 'rus+eng', {
+                logger: m => { if(m.status === 'recognizing') statusDiv.textContent = `Распознавание: ${Math.round(m.progress * 100)}%`; }
+            });
+            
+            const scannedText = result.data.text.trim();
+            if (scannedText) {
+                searchInput.value = scannedText; // помещаем текст в инпут для наглядности
+                statusDiv.textContent = `Распознано: "${scannedText}". Ищем в таблице...`;
+                searchInGoogleSheets(scannedText);
             } else {
-                outputDiv.textContent = `❌ Штрихкод "${code}" не найден в загруженных таблицах.`;
+                statusDiv.textContent = 'Текст не найден. Попробуйте еще раз или введите вручную.';
             }
-        });
-    }
-
-    // Переключение камеры
-    toggleCameraBtn.addEventListener('click', () => {
-        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        if (quaggaInitialized) {
-            startScanner(); // перезапуск с новой камерой
+        } catch (error) {
+            console.error(error);
+            statusDiv.textContent = 'Ошибка при распознавании текста.';
         }
     });
 
-    // Кнопка запуска
-    startScannerBtn.addEventListener('click', startScanner);
+    // 3. Логика ручного поиска
+    searchBtn.addEventListener('click', () => {
+        const query = searchInput.value.trim();
+        if (query) {
+            statusDiv.textContent = `Ищем "${query}" в таблице...`;
+            searchInGoogleSheets(query);
+        } else {
+            statusDiv.textContent = 'Пожалуйста, введите текст для поиска.';
+        }
+    });
 
-    // Инициализация при загрузке страницы
-    loadTablesFromStorage();
+    // 4. Отправка запроса в Google Таблицы
+    async function searchInGoogleSheets(text) {
+        if (WEB_APP_URL.includes('УКАЖИТЕ_ЗДЕСЬ_ВАШ_URL')) {
+            statusDiv.textContent = 'Ошибка: Не настроен URL скрипта Google Таблиц.';
+            return;
+        }
+
+        try {
+            // Отправляем GET-запрос к Google Apps Script
+            const response = await fetch(`${WEB_APP_URL}?query=${encodeURIComponent(text)}`);
+            const data = await response.json();
+
+            if (data.success && data.results.length > 0) {
+                statusDiv.textContent = `Найдено совпадений: ${data.results.length}`;
+                resultsDiv.style.display = 'block';
+                resultsDiv.innerHTML = '<h3>Результаты поиска:</h3>' + 
+                    data.results.map(row => `<p><strong>Строка:</strong> ${row.join(', ')}</p>`).join('');
+            } else {
+                statusDiv.textContent = 'Совпадений в таблице не найдено.';
+                resultsDiv.style.display = 'none';
+            }
+        } catch (error) {
+            console.error(error);
+            statusDiv.textContent = 'Ошибка сети или таблицы при поиске.';
+        }
+    }
 </script>
+
 </body>
 </html>
