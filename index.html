@@ -2,139 +2,219 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Веб-сканер цифр (OCR)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Веб-сканер цифр (OCR Pro)</title>
     <style>
+        :root {
+            --primary: #3498db;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #e67e22;
+            --dark: #2c3e50;
+            --light: #f8f9fa;
+            --border: #e2e8f0;
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f4f6f9;
             color: #333;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
         }
+        
         .container {
             max-width: 600px;
             width: 100%;
             background: #fff;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-            box-sizing: border-box;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
-        h1 { font-size: 24px; margin-top: 0; }
-        .video-container {
+        
+        h1 { font-size: 22px; margin: 0 0 15px 0; text-align: center; color: var(--dark); }
+        h3 { font-size: 16px; margin: 15px 0 8px 0; color: var(--dark); }
+        
+        /* Видео контейнер */
+        .video-wrapper {
             position: relative;
             width: 100%;
-            height: 320px;
+            aspect-ratio: 4/3;
             background: #000;
-            border-radius: 6px;
-            overflow: hidden;
-            margin: 20px 0;
+            border-radius: 8px;            overflow: hidden;
+            margin: 15px 0;
         }
+        
         #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            display: block;
         }
-        /* Рамка прицела для цифр */
+        
         .scan-region {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             width: 70%;
-            height: 60px;
-            border: 3px solid #2ecc71;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); /* Затемнение фона вокруг рамки */
-            border-radius: 4px;
-            pointer-events: none;
-        }
-        #output {
-            margin-top: 20px;
-            padding: 15px;
-            background: #2c3e50;
-            color: #ecf0f1;
-            border-radius: 4px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            text-align: left;
-            min-height: 60px;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-        .section-box {
-            margin: 15px 0;
-            text-align: left;
-            background: #f8f9fa;
-            padding: 15px;
+            height: 80px;
+            border: 3px solid var(--success);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
             border-radius: 6px;
-            border: 1px solid #e2e8f0;
+            pointer-events: none;
+            z-index: 10;
         }
-        .input-group {
+        
+        .scan-region::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
+        
+        /* Секции */
+        .section-box {
+            background: var(--light);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+        }
+        
+        .section-label {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+            display: block;
+            color: var(--dark);
+        }
+                .input-group {
             display: flex;
-            margin-top: 8px;
+            gap: 0;
         }
+        
         .input-group input {
             flex: 1;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ccc;
-            border-radius: 4px 0 0 4px;
+            border-right: none;
+            border-radius: 6px 0 0 6px;
             font-size: 14px;
+            outline: none;
+            min-width: 0;
         }
+        
+        .input-group input:focus { border-color: var(--primary); }
+        
         .input-group button {
-            border-radius: 0 4px 4px 0;
-            margin: 0;
-            padding: 10px 15px;
+            border-radius: 0 6px 6px 0;
+            white-space: nowrap;
         }
-        .table-list {
+        
+        /* Списки */
+        .list-items {
             list-style: none;
             padding: 0;
             margin: 8px 0 0 0;
+            max-height: 150px;
+            overflow-y: auto;
         }
-        .table-list li {
-            background: #e9ecef;
+        
+        .list-item {
+            background: #fff;
+            border: 1px solid var(--border);
             margin: 4px 0;
-            padding: 8px 10px;
-            border-radius: 4px;
+            padding: 10px 12px;
+            border-radius: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            word-break: break-all;
             font-size: 13px;
+            word-break: break-all;
         }
-        .table-list li button {
-            background: #e74c3c;
-            border: none;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 0;
+        
+        .list-item .item-text { flex: 1; margin-right: 8px; }
+        .list-item .item-time { font-size: 11px; color: #999; margin-right: 8px; white-space: nowrap; }
+        
+        .btn-remove {
+            background: var(--danger) !important;            padding: 4px 10px !important;
+            font-size: 12px !important;
+            min-width: auto !important;
         }
+        
+        /* Результат */
+        #output {
+            padding: 15px;
+            background: var(--dark);
+            color: #ecf0f1;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            min-height: 60px;
+            line-height: 1.5;
+        }
+        
+        /* Кнопки */
         button {
-            background-color: #3498db;
+            background: var(--primary);
             color: white;
             border: none;
             padding: 12px 20px;
-            font-size: 15px;
-            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
             cursor: pointer;
-            margin: 5px;
-            transition: background 0.3s;
-            font-weight: bold;
+            transition: opacity 0.2s;
+            min-width: 100px;
         }
-        button:hover {
-            opacity: 0.9;
-        }
-        .camera-select {
+        
+        button:hover { opacity: 0.9; }
+        button:active { opacity: 0.8; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-success { background: var(--success) !important; }
+        .btn-warning { background: var(--warning) !important; }
+        .btn-danger { background: var(--danger) !important; }
+        
+        .camera-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
             margin: 10px 0;
         }
-        #canvasHidden {
-            display: none;
+        
+        .camera-controls button { flex: 1; min-width: 120px; }
+                /* Спиннер загрузки */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        #canvasHidden { display: none; }
+        
+        /* Адаптив */
+        @media (max-width: 400px) {
+            .camera-controls button { min-width: 80px; padding: 10px 12px; font-size: 13px; }
+            h1 { font-size: 18px; }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -142,276 +222,541 @@
 <body>
 
 <div class="container">
-    <h1>Сканер ЦИФР + Таблицы</h1>
+    <h1>📷 Сканер Цифр + Таблицы</h1>
 
+    <!-- База таблиц -->
     <div class="section-box">
-        <label style="font-weight: bold;">📋 База Google Таблиц (CSV):</label>
+        <label class="section-label">📋 База Google Таблиц (CSV):</label>
         <div class="input-group">
-            <input type="text" id="tableUrlInput" placeholder="Вставьте URL CSV-таблицы">
+            <input type="text" id="tableUrlInput" placeholder="Вставьте URL опубликованной CSV таблицы">
             <button id="addTableBtn">➕ Добавить</button>
         </div>
-        <ul id="tableList" class="table-list"></ul>
+        <ul id="tableList" class="list-items"></ul>
     </div>
 
+    <!-- Ручной ввод -->
     <div class="section-box">
-        <label style="font-weight: bold;">✍️ Ввести цифры вручную:</label>
+        <label class="section-label">✍️ Ввести цифры вручную:</label>
         <div class="input-group">
-            <input type="number" id="manualCodeInput" placeholder="Введите цифры">
-            <button id="checkManualCodeBtn" style="background-color: #2ecc71;">🔍 Найти</button>
+            <input type="number" id="manualCodeInput" placeholder="Введите код" inputmode="numeric">
+            <button id="checkManualCodeBtn" class="btn-success">🔍 Найти</button>
         </div>
     </div>
 
-    <div class="camera-select">
-        <button id="toggleCamera">📷 Сменить камеру</button>
-        <button id="startScannerBtn" style="background-color: #e67e22;">▶️ Включить камеру</button>
+    <!-- Управление камерой -->    <div class="camera-controls">
+        <button id="startScannerBtn" class="btn-warning">▶️ Камера</button>
+        <button id="toggleCameraBtn">🔄 Фронт./Зад.</button>
+        <button id="torchBtn" disabled>🔦 Фонарик</button>
     </div>
 
-    <div class="video-container">
+    <!-- Видео -->
+    <div class="video-wrapper">
         <video id="video" autoplay playsinline muted></video>
         <div class="scan-region"></div>
     </div>
 
     <canvas id="canvasHidden"></canvas>
 
-    <h3 style="margin-bottom: 5px;">Результат:</h3>
-    <div id="output">Загрузка модуля распознавания (потребуется пара секунд)...</div>
+    <!-- Результат -->
+    <h3>Результат:</h3>
+    <div id="output">⏳ Загрузка модуля распознавания...</div>
+
+    <!-- История -->
+    <h3>📜 История сканирований:</h3>
+    <ul id="historyList" class="list-items"></ul>
+    <div style="margin-top: 8px; text-align: center;">
+        <button id="exportHistoryBtn" style="font-size: 12px; padding: 8px 16px; min-width: auto;">📥 Скачать историю (CSV)</button>
+        <button id="clearHistoryBtn" class="btn-danger" style="font-size: 12px; padding: 8px 16px; min-width: auto;">🗑 Очистить</button>
+    </div>
 </div>
 
 <script>
-    let stream = null;
-    let currentFacingMode = "environment"; 
-    let tables = []; 
-    let tableData = {}; 
-    let isScanning = false;
-    let tesseractWorker = null;
-    let lastFoundCode = null; // Чтобы не выводить одно и то же каждую секунду
-
-    const video = document.getElementById('video');
-    const canvasHidden = document.getElementById('canvasHidden');
-    const outputDiv = document.getElementById('output');
-    const tableUrlInput = document.getElementById('tableUrlInput');
-    const addTableBtn = document.getElementById('addTableBtn');
-    const tableListEl = document.getElementById('tableList');
-    const toggleCameraBtn = document.getElementById('toggleCamera');
-    const startScannerBtn = document.getElementById('startScannerBtn');
-    const manualCodeInput = document.getElementById('manualCodeInput');
-    const checkManualCodeBtn = document.getElementById('checkManualCodeBtn');
-
-    // Инициализация Tesseract
-    async function initTesseract() {
-        try {
-            tesseractWorker = await Tesseract.createWorker('eng');
-            await tesseractWorker.setParameters({
-                tessedit_char_whitelist: '0123456789',
-            });
-            outputDiv.textContent = "✅ Модуль готов. Нажмите 'Включить камеру' или введите цифры вручную.";
-        } catch (err) {
-            outputDiv.textContent = "❌ Ошибка загрузки распознавания: " + err.message;
-        }
+// ==================== КОНФИГУРАЦИЯ ====================
+const CONFIG = {
+    SCAN_INTERVAL_MS: 600,       // Минимальная пауза между сканами
+    MIN_DIGITS: 3,               // Минимум цифр для обработки
+    ANTI_SPAM_MS: 2500,          // Защита от повторного срабатывания одного кода
+    HISTORY_MAX: 50,             // Макс. записей в истории
+    CORS_PROXY: 'https://api.allorigins.win/raw?url=',
+    STORAGE_KEYS: {
+        TABLES: 'scanner_tables',
+        HISTORY: 'scanner_history'
     }
+};
 
-    // Хранилище таблиц
-    function loadTablesFromStorage() {
-        const stored = localStorage.getItem('webScannerTables');
-        if (stored) {
-            try { tables = JSON.parse(stored); } catch(e) { tables = []; }
-        }
-        renderTableList();
-        reloadAllTablesData();
-    }
+// ==================== СОСТОЯНИЕ ====================
+const state = {
+    stream: null,
+    facingMode: 'environment',
+    isScanning: false,
+    isProcessing: false,
+    tesseractWorker: null,
+    lastFoundCode: null,
+    lastFoundTime: 0,    tables: [],
+    tableData: {},
+    history: [],
+    torchOn: false
+};
 
-    function saveTablesToStorage() {
-        localStorage.setItem('webScannerTables', JSON.stringify(tables));
-    }
+// ==================== DOM ЭЛЕМЕНТЫ ====================
+const $ = (id) => document.getElementById(id);
+const video = $('video');
+const canvas = $('canvasHidden');
+const outputDiv = $('output');
+const tableUrlInput = $('tableUrlInput');
+const addTableBtn = $('addTableBtn');
+const tableListEl = $('tableList');
+const startScannerBtn = $('startScannerBtn');
+const toggleCameraBtn = $('toggleCameraBtn');
+const torchBtn = $('torchBtn');
+const manualCodeInput = $('manualCodeInput');
+const checkManualCodeBtn = $('checkManualCodeBtn');
+const historyListEl = $('historyList');
+const exportHistoryBtn = $('exportHistoryBtn');
+const clearHistoryBtn = $('clearHistoryBtn');
 
-    function renderTableList() {
-        tableListEl.innerHTML = '';
-        tables.forEach((url, index) => {
-            const li = document.createElement('li');
-            li.textContent = url.length > 35 ? url.substring(0, 35) + "..." : url;
-            const removeBtn = document.createElement('button');
-            removeBtn.textContent = 'Удалить';
-            removeBtn.onclick = () => {
-                tables.splice(index, 1);
-                saveTablesToStorage();
-                renderTableList();
-                reloadAllTablesData();
-            };
-            li.appendChild(removeBtn);
-            tableListEl.appendChild(li);
-        });
-    }
-
-    async function fetchTableCSV(url) {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Ошибка сети');
-        const text = await response.text();
-        const rows = text.trim().split('\n');
-        const data = {};
+// ==================== ЗВУК И ВИБРАЦИЯ ====================
+function playBeep(success) {
+    try {
+        if (navigator.vibrate) navigator.vibrate(success ? [100] : [50, 50, 50]);
         
-        rows.forEach(row => {
-            const cols = row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
-            if (cols.length > 0 && cols[0]) {
-                const cleanKey = cols[0].replace(/\D/g, ''); 
-                if (cleanKey) data[cleanKey] = cols;    
-            }
-        });
-        return data;
-    }
-
-    async function reloadAllTablesData() {
-        tableData = {};
-        if (tables.length === 0) return;
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
         
-        let loadedCount = 0;
-        for (const url of tables) {
-            try {
-                const newData = await fetchTableCSV(url);
-                Object.assign(tableData, newData);
-                loadedCount++;
-            } catch (error) {
-                console.error('Ошибка загрузки:', url, error);
-            }
-        }
-    }
+        osc.frequency.value = success ? 880 : 330;
+        osc.type = success ? 'sine' : 'square';
+        gain.gain.value = 0.1;
+        
+        osc.start();
+        osc.stop(ctx.currentTime + (success ? 0.15 : 0.3));
+    } catch(e) { /* Тихий фолбек если аудио заблокировано */ }
+}
 
-    addTableBtn.addEventListener('click', () => {
-        const url = tableUrlInput.value.trim();
-        if (!url) return;
-        if (!tables.includes(url)) {
-            tables.push(url);
-            saveTablesToStorage();
+// ==================== TESSERACT ====================
+async function initTesseract() {
+    try {
+        state.tesseractWorker = await Tesseract.createWorker('eng');
+        await state.tesseractWorker.setParameters({
+            tessedit_char_whitelist: '0123456789',
+            tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,        });
+        outputDiv.textContent = '✅ Модуль готов. Нажмите "Камера" или введите код вручную.';
+    } catch (err) {
+        outputDiv.textContent = '❌ Ошибка загрузки OCR: ' + err.message;
+        console.error(err);
+    }
+}
+
+// ==================== ТАБЛИЦЫ (CSV) ====================
+function loadTables() {
+    try {
+        state.tables = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.TABLES)) || [];
+    } catch { state.tables = []; }
+    renderTableList();
+    reloadAllTables();
+}
+
+function saveTables() {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.TABLES, JSON.stringify(state.tables));
+}
+
+function renderTableList() {
+    tableListEl.innerHTML = '';
+    state.tables.forEach((url, i) => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        
+        const text = document.createElement('span');
+        text.className = 'item-text';
+        text.textContent = url.length > 40 ? url.substring(0, 40) + '...' : url;
+        
+        const btn = document.createElement('button');
+        btn.className = 'btn-remove';
+        btn.textContent = '✕';
+        btn.onclick = () => {
+            state.tables.splice(i, 1);
+            saveTables();
             renderTableList();
-            reloadAllTablesData();
-        }
-        tableUrlInput.value = '';
+            reloadAllTables();
+        };
+        
+        li.appendChild(text);
+        li.appendChild(btn);
+        tableListEl.appendChild(li);
     });
+}
 
-    // Поиск по коду
-    function processCode(code) {
-        const cleanCode = code.replace(/\D/g, '');
-        if (!cleanCode || cleanCode.length < 3) return; // Игнорируем шумы короче 3 цифр
-        
-        // Предотвращаем спам одним и тем же кодом при сканировании
-        if (cleanCode === lastFoundCode) return;
-        lastFoundCode = cleanCode;
-
-        if (tableData[cleanCode]) {
-            const row = tableData[cleanCode];
-            const info = row.slice(1).join(', ');
-            outputDiv.textContent = `🔢 Считано: ${cleanCode}\n✅ Найдено: ${info}`;
+/**
+ * Парсинг CSV с поддержкой кавычек и запятых внутри ячеек
+ */function parseCSV(text) {
+    const rows = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '"') {
+            if (inQuotes && text[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if ((ch === ',' || ch === '\n' || ch === '\r') && !inQuotes) {
+            if (ch === ',') {
+                rows.push(current.trim());
+                current = '';
+            } else {
+                rows.push(current.trim());
+                current = '';
+                // Пропускаем \r\n как один разделитель
+                if (ch === '\r' && text[i + 1] === '\n') i++;
+                // Маркер конца строки
+                rows.push('__ROW_END__');
+            }
         } else {
-            outputDiv.textContent = `🔢 Считано: ${cleanCode}\n❌ В базе не найдено.`;
+            current += ch;
         }
-        
-        // Сбрасываем фильтр анти-спама через 3 секунды
-        setTimeout(() => { lastFoundCode = null; }, 3000);
     }
+    if (current.trim()) rows.push(current.trim());
+    rows.push('__ROW_END__');
+    
+    // Собираем строки
+    const result = {};
+    let row = [];
+    for (const cell of rows) {
+        if (cell === '__ROW_END__') {
+            if (row.length > 0 && row[0]) {
+                const key = row[0].replace(/\D/g, '');
+                if (key) result[key] = row;
+            }
+            row = [];
+        } else {
+            row.push(cell);
+        }
+    }
+    return result;
+}
+async function fetchTableCSV(url) {
+    const proxyUrl = CONFIG.CORS_PROXY + encodeURIComponent(url);
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    return parseCSV(text);
+}
 
-    // Ручной ввод
-    checkManualCodeBtn.addEventListener('click', () => {
-        const code = manualCodeInput.value.trim();
-        if (!code) {
-            outputDiv.textContent = "Введите цифры для поиска.";
+async function reloadAllTables() {
+    state.tableData = {};
+    if (state.tables.length === 0) return;
+    
+    let loaded = 0;
+    let errors = 0;
+    
+    for (const url of state.tables) {
+        try {
+            const data = await fetchTableCSV(url);
+            Object.assign(state.tableData, data);
+            loaded++;
+        } catch (err) {
+            console.error('Ошибка загрузки таблицы:', url, err);
+            errors++;
+        }
+    }
+    
+    const totalKeys = Object.keys(state.tableData).length;
+    console.log(`Таблицы загружены: ${loaded}/${state.tables.length}, записей: ${totalKeys}, ошибок: ${errors}`);
+}
+
+addTableBtn.addEventListener('click', async () => {
+    const url = tableUrlInput.value.trim();
+    if (!url) return;
+    if (state.tables.includes(url)) {
+        outputDiv.textContent = '⚠️ Эта таблица уже добавлена.';
+        return;
+    }
+    
+    // Показываем индикатор загрузки
+    const originalText = addTableBtn.textContent;
+    addTableBtn.disabled = true;
+    addTableBtn.innerHTML = '<span class="spinner"></span>Загрузка...';
+    
+    try {
+        // Проверяем доступность перед добавлением
+        await fetchTableCSV(url);
+        state.tables.push(url);
+        saveTables();
+        renderTableList();
+        await reloadAllTables();        tableUrlInput.value = '';
+        outputDiv.textContent = `✅ Таблица добавлена. Всего записей: ${Object.keys(state.tableData).length}`;
+    } catch (err) {
+        outputDiv.textContent = `❌ Не удалось загрузить таблицу: ${err.message}\nУбедитесь, что таблица опубликована в формате CSV.`;
+    } finally {
+        addTableBtn.disabled = false;
+        addTableBtn.textContent = originalText;
+    }
+});
+
+// ==================== ОБРАБОТКА КОДА ====================
+function processCode(rawCode) {
+    const code = rawCode.replace(/\D/g, '');
+    if (!code || code.length < CONFIG.MIN_DIGITS) return;
+    
+    // Анти-спам
+    const now = Date.now();
+    if (code === state.lastFoundCode && (now - state.lastFoundTime) < CONFIG.ANTI_SPAM_MS) return;
+    
+    state.lastFoundCode = code;
+    state.lastFoundTime = now;
+    
+    const rowData = state.tableData[code];
+    
+    if (rowData) {
+        const info = rowData.slice(1).join(' | ');
+        outputDiv.textContent = `🔢 Код: ${code}\n✅ НАЙДЕНО: ${info}`;
+        playBeep(true);
+        addToHistory(code, info, true);
+    } else {
+        outputDiv.textContent = `🔢 Код: ${code}\n❌ Не найден в базе (${Object.keys(state.tableData).length} записей)`;
+        playBeep(false);
+        addToHistory(code, 'Не найден', false);
+    }
+}
+
+// ==================== РУЧНОЙ ВВОД ====================
+checkManualCodeBtn.addEventListener('click', () => {
+    const code = manualCodeInput.value.trim();
+    if (!code) { outputDiv.textContent = '⚠️ Введите цифры для поиска.'; return; }
+    processCode(code);
+    manualCodeInput.value = '';
+});
+
+manualCodeInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') checkManualCodeBtn.click();
+});
+
+// ==================== КАМЕРА ====================
+function stopCamera() {    if (state.stream) {
+        state.stream.getTracks().forEach(t => t.stop());
+        state.stream = null;
+    }
+    state.isScanning = false;
+    state.torchOn = false;
+    torchBtn.disabled = true;
+    torchBtn.textContent = '🔦 Фонарик';
+    startScannerBtn.textContent = '▶️ Камера';
+    startScannerBtn.className = 'btn-warning';
+    video.srcObject = null;
+}
+
+async function startCamera() {
+    stopCamera();
+    
+    try {
+        state.stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: state.facingMode,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        });
+        
+        video.srcObject = state.stream;
+        state.isScanning = true;
+        startScannerBtn.textContent = '⏹ Стоп';
+        startScannerBtn.className = 'btn-danger';
+        torchBtn.disabled = false;
+        outputDiv.textContent = '📷 Камера активна. Поместите цифры в зелёную рамку.';
+        
+        requestAnimationFrame(scanLoop);
+    } catch (err) {
+        outputDiv.textContent = '❌ Ошибка камеры: ' + err.message;
+        console.error(err);
+    }
+}
+
+startScannerBtn.addEventListener('click', () => {
+    state.isScanning ? stopCamera() : startCamera();
+});
+
+toggleCameraBtn.addEventListener('click', () => {
+    state.facingMode = state.facingMode === 'environment' ? 'user' : 'environment';
+    if (state.isScanning) startCamera();
+});
+
+torchBtn.addEventListener('click', async () => {
+    if (!state.stream) return;    const track = state.stream.getVideoTracks()[0];
+    try {
+        state.torchOn = !state.torchOn;
+        await track.applyConstraints({ advanced: [{ torch: state.torchOn }] });
+        torchBtn.textContent = state.torchOn ? '🔦 Выкл.' : '🔦 Фонарик';
+        torchBtn.className = state.torchOn ? 'btn-warning' : '';
+    } catch (err) {
+        outputDiv.textContent = '⚠️ Фонарик не поддерживается этой камерой.';
+        torchBtn.disabled = true;
+    }
+});
+
+// ==================== OCR ЦИКЛ ====================
+/**
+ * Корректный расчет координат кропа с учетом object-fit: cover
+ */
+function getCropRect() {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const cw = video.clientWidth;
+    const ch = video.clientHeight;
+    
+    if (!vw || !vh || !cw || !ch) return null;
+    
+    // Масштаб покрытия (cover)
+    const scale = Math.max(cw / vw, ch / vh);
+    
+    // Видимая часть видео в пикселях видео
+    const visibleW = cw / scale;
+    const visibleH = ch / scale;
+    
+    // Смещение (центрирование при cover)
+    const offsetX = (vw - visibleW) / 2;
+    const offsetY = (vh - visibleH) / 2;
+    
+    // Рамка: 70% ширины контейнера, 80px высоты, по центру
+    const regionW = cw * 0.7;
+    const regionH = 80;
+    const regionX = (cw - regionW) / 2;
+    const regionY = (ch - regionH) / 2;
+    
+    // Переводим координаты рамки в координаты видео
+    return {
+        x: offsetX + regionX / scale,
+        y: offsetY + regionY / scale,
+        w: regionW / scale,
+        h: regionH / scale
+    };
+}
+async function scanLoop() {
+    if (!state.isScanning || !state.tesseractWorker || state.isProcessing) return;
+    
+    if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+        const rect = getCropRect();
+        if (!rect || rect.w < 10 || rect.h < 10) {
+            requestAnimationFrame(scanLoop);
             return;
         }
-        processCode(code);
-        manualCodeInput.value = '';
-    });
-
-    manualCodeInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') checkManualCodeBtn.click();
-    });
-
-    // Управление камерой
-    function stopCamera() {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-        }
-        isScanning = false;
-        startScannerBtn.textContent = '▶️ Включить камеру';
-        startScannerBtn.style.backgroundColor = '#e67e22';
-        outputDiv.textContent = "Камера остановлена.";
-    }
-
-    async function startCamera() {
-        if (stream) stopCamera();
-
+        
+        state.isProcessing = true;
+        
+        const ctx = canvas.getContext('2d');
+        canvas.width = Math.round(rect.w);
+        canvas.height = Math.round(rect.h);
+        
+        // Предобработка: grayscale + высокий контраст для цифр
+        ctx.filter = 'grayscale(100%) contrast(250%) brightness(110%)';
+        ctx.drawImage(
+            video,
+            Math.round(rect.x), Math.round(rect.y), Math.round(rect.w), Math.round(rect.h),
+            0, 0, canvas.width, canvas.height
+        );
+        ctx.filter = 'none';
+        
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
-            });
-            video.srcObject = stream;
-            isScanning = true;
-            startScannerBtn.textContent = '⏹ Остановить камеру';
-            startScannerBtn.style.backgroundColor = '#e74c3c';
-            outputDiv.textContent = "Камера работает. Поместите цифры строго в зеленую рамку.";
-            
-            requestAnimationFrame(scanFrameLoop);
-        } catch (err) {
-            outputDiv.textContent = "Ошибка доступа к камере: " + err.message;
-        }
-    }
-
-    startScannerBtn.addEventListener('click', () => {
-        if (isScanning) {
-            stopCamera();
-        } else {
-            startCamera();
-        }
-    });
-
-    toggleCameraBtn.addEventListener('click', () => {
-        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        if (isScanning) startCamera();
-    });
-
-    // Цикл распознавания
-    async function scanFrameLoop() {
-        if (!isScanning || !tesseractWorker) return;
-
-        // Проверяем, что видео реально прогрузилось и имеет размеры
-        if (video.readyState === video.HAVE_ENOUGH_DATA && video.clientHeight > 0) {
-            const ctx = canvasHidden.getContext('2d');
-            
-            const vWidth = video.videoWidth;
-            const vHeight = video.videoHeight;
-
-            // Вырезаем кусок строго из зеленой рамки
-            const cropWidth = vWidth * 0.7;
-            const cropHeight = vHeight * (60 / video.clientHeight);
-            const cropX = (vWidth - cropWidth) / 2;
-            const cropY = (vHeight - cropHeight) / 2;
-
-            canvasHidden.width = cropWidth;
-            canvasHidden.height = cropHeight;
-
-            ctx.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-
-            try {
-                const { data: { text } } = await tesseractWorker.recognize(canvasHidden);
-                const digits = text.replace(/\D/g, ''); 
-
-                if (digits.length >= 3) {
-                    processCode(digits);
-                }
-            } catch (e) {
-                console.error("Ошибка OCR:", e);
+            const { data: { text } } = await state.tesseractWorker.recognize(canvas);
+            const digits = text.replace(/\D/g, '');
+            if (digits.length >= CONFIG.MIN_DIGITS) {
+                processCode(digits);
             }
+        } catch (err) {
+            console.error('OCR ошибка:', err);
+        } finally {
+            state.isProcessing = false;
         }
-
-        // Сканируем примерно раз в 1 секунду, чтобы не сжечь процессор телефона
-        setTimeout(() => {
-            if (isScanning) requestAnimationFrame(scanFrameLoop);
-        }, 1000);
     }
+    
+    setTimeout(() => {
+        if (state.isScanning) requestAnimationFrame(scanLoop);
+    }, CONFIG.SCAN_INTERVAL_MS);
+}
 
-    // Старт
-    initTesseract().then(() => {
-        loadTablesFromStorage();
+// ==================== ИСТОРИЯ ====================
+function loadHistory() {
+    try {
+        state.history = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.HISTORY)) || [];
+    } catch { state.history = []; }
+    renderHistory();
+}
+function saveHistory() {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.HISTORY, JSON.stringify(state.history));
+}
+
+function addToHistory(code, info, found) {
+    const entry = {
+        code,
+        info,
+        found,
+        time: new Date().toLocaleString('ru-RU')
+    };
+    state.history.unshift(entry);
+    if (state.history.length > CONFIG.HISTORY_MAX) state.history.pop();
+    saveHistory();
+    renderHistory();
+}
+
+function renderHistory() {
+    historyListEl.innerHTML = '';
+    state.history.forEach((entry, i) => {
+        const li = document.createElement('li');
+        li.className = 'list-item';
+        li.style.borderLeft = `3px solid ${entry.found ? 'var(--success)' : 'var(--danger)'}`;
+        
+        const text = document.createElement('span');
+        text.className = 'item-text';
+        text.innerHTML = `<strong>${entry.code}</strong> — ${entry.info}`;
+        
+        const time = document.createElement('span');
+        time.className = 'item-time';
+        time.textContent = entry.time;
+        
+        li.appendChild(text);
+        li.appendChild(time);
+        historyListEl.appendChild(li);
     });
-</script>
+}
 
+clearHistoryBtn.addEventListener('click', () => {
+    if (confirm('Очистить всю историю сканирований?')) {
+        state.history = [];
+        saveHistory();
+        renderHistory();
+        outputDiv.textContent = '🗑 История очищена.';
+    }
+});
+
+exportHistoryBtn.addEventListener('click', () => {
+    if (state.history.length === 0) {        outputDiv.textContent = '⚠️ История пуста.';
+        return;
+    }
+    
+    const BOM = '\uFEFF';
+    const header = 'Код;Информация;Найдено;Дата/Время\n';
+    const rows = state.history.map(h => 
+        `"${h.code}";"${h.info}";${h.found ? 'Да' : 'Нет'};"${h.time}"`
+    ).join('\n');
+    
+    const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `scan_history_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+});
+
+// ==================== ИНИЦИАЛИЗАЦИЯ ====================
+(async function init() {
+    loadTables();
+    loadHistory();
+    await initTesseract();
+})();
+</script>
 </body>
 </html>
