@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Веб-сканер с Google Таблицами</title>
+    <title>Веб-сканер цифр (OCR)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -25,184 +25,392 @@
             text-align: center;
             box-sizing: border-box;
         }
-        #viewport-container {
+        h1 { font-size: 24px; margin-top: 0; }
+        .video-container {
             position: relative;
             width: 100%;
-            height: 300px;
+            height: 320px;
             background: #000;
             border-radius: 6px;
             overflow: hidden;
             margin: 20px 0;
         }
-        video, canvas {
+        #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        canvas {
-            display: none;
-        }
-        .form-group {
-            margin-bottom: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        input[type="text"] {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
+        /* Рамка прицела для цифр */
+        .scan-region {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 60px;
+            border: 3px solid #2ecc71;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); /* Затемнение фона вокруг рамки */
             border-radius: 4px;
-            font-size: 16px;
+            pointer-events: none;
         }
-        button {
-            padding: 10px 20px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        button:hover {
-            background: #218838;
-        }
-        button.secondary {
-            background: #007bff;
-        }
-        button.secondary:hover {
-            background: #0069d9;
-        }
-        #status {
-            margin: 10px 0;
-            color: #666;
-            font-style: italic;
-        }
-        #results {
+        #output {
             margin-top: 20px;
+            padding: 15px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            text-align: left;
+            min-height: 60px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .section-box {
+            margin: 15px 0;
             text-align: left;
             background: #f8f9fa;
             padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .input-group {
+            display: flex;
+            margin-top: 8px;
+        }
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px 0 0 4px;
+            font-size: 14px;
+        }
+        .input-group button {
+            border-radius: 0 4px 4px 0;
+            margin: 0;
+            padding: 10px 15px;
+        }
+        .table-list {
+            list-style: none;
+            padding: 0;
+            margin: 8px 0 0 0;
+        }
+        .table-list li {
+            background: #e9ecef;
+            margin: 4px 0;
+            padding: 8px 10px;
             border-radius: 4px;
-            border-left: 4px solid #28a745;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            word-break: break-all;
+            font-size: 13px;
+        }
+        .table-list li button {
+            background: #e74c3c;
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .camera-select {
+            margin: 10px 0;
+        }
+        #canvasHidden {
             display: none;
         }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h2>Сканер текста и поиск</h2>
-    
-    <div id="viewport-container">
-        <video id="video" autoplay playsinline></video>
-        <canvas id="canvas"></canvas>
+    <h1>Сканер ЦИФР + Таблицы</h1>
+
+    <div class="section-box">
+        <label style="font-weight: bold;">📋 База Google Таблиц (CSV):</label>
+        <div class="input-group">
+            <input type="text" id="tableUrlInput" placeholder="Вставьте URL CSV-таблицы">
+            <button id="addTableBtn">➕ Добавить</button>
+        </div>
+        <ul id="tableList" class="table-list"></ul>
     </div>
 
-    <button class="secondary" id="snap-btn">Распознать с камеры</button>
-
-    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-
-    <div class="form-group">
-        <input type="text" id="search-input" placeholder="Введите текст для поиска вручную...">
-        <button id="search-btn">Искать</button>
+    <div class="section-box">
+        <label style="font-weight: bold;">✍️ Ввести цифры вручную:</label>
+        <div class="input-group">
+            <input type="number" id="manualCodeInput" placeholder="Введите цифры">
+            <button id="checkManualCodeBtn" style="background-color: #2ecc71;">🔍 Найти</button>
+        </div>
     </div>
 
-    <div id="status">Запуск камеры...</div>
-    <div id="results"></div>
+    <div class="camera-select">
+        <button id="toggleCamera">📷 Сменить камеру</button>
+        <button id="startScannerBtn" style="background-color: #e67e22;">▶️ Включить камеру</button>
+    </div>
+
+    <div class="video-container">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="scan-region"></div>
+    </div>
+
+    <canvas id="canvasHidden"></canvas>
+
+    <h3 style="margin-bottom: 5px;">Результат:</h3>
+    <div id="output">Загрузка модуля распознавания (потребуется пара секунд)...</div>
 </div>
 
 <script>
-    // URL вашего развернутого Web App из Google Apps Script
-    const WEB_APP_URL = 'УКАЖИТЕ_ЗДЕСЬ_ВАШ_URL_ПОСЛЕ_НАСТРОЙКИ';
+    let stream = null;
+    let currentFacingMode = "environment"; 
+    let tables = []; 
+    let tableData = {}; 
+    let isScanning = false;
+    let tesseractWorker = null;
+    let lastFoundCode = null; // Чтобы не выводить одно и то же каждую секунду
 
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const snapBtn = document.getElementById('snap-btn');
-    const searchInput = document.getElementById('search-input');
-    const searchBtn = document.getElementById('search-btn');
-    const statusDiv = document.getElementById('status');
-    const resultsDiv = document.getElementById('results');
+    const canvasHidden = document.getElementById('canvasHidden');
+    const outputDiv = document.getElementById('output');
+    const tableUrlInput = document.getElementById('tableUrlInput');
+    const addTableBtn = document.getElementById('addTableBtn');
+    const tableListEl = document.getElementById('tableList');
+    const toggleCameraBtn = document.getElementById('toggleCamera');
+    const startScannerBtn = document.getElementById('startScannerBtn');
+    const manualCodeInput = document.getElementById('manualCodeInput');
+    const checkManualCodeBtn = document.getElementById('checkManualCodeBtn');
 
-    // 1. Инициализация камеры
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(stream => {
-            video.srcObject = stream;
-            statusDiv.textContent = 'Камера готова. Наведите на текст и нажмите кнопку.';
-        })
-        .catch(err => {
-            console.error("Ошибка камеры: ", err);
-            statusDiv.textContent = 'Не удалось получить доступ к камере. Используйте ручной ввод.';
-        });
-
-    // 2. Логика сканирования и распознавания текста (OCR)
-    snapBtn.addEventListener('click', async () => {
-        statusDiv.textContent = 'Делаем снимок и распознаем текст... (это может занять 3-5 сек)';
-        
-        // Рисуем текущий кадр видео на скрытый canvas
-        const context = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+    // Инициализация Tesseract
+    async function initTesseract() {
         try {
-            // Запускаем Tesseract (поддерживает русский и английский)
-            const result = await Tesseract.recognize(canvas, 'rus+eng', {
-                logger: m => { if(m.status === 'recognizing') statusDiv.textContent = `Распознавание: ${Math.round(m.progress * 100)}%`; }
+            tesseractWorker = await Tesseract.createWorker('eng');
+            await tesseractWorker.setParameters({
+                tessedit_char_whitelist: '0123456789',
             });
-            
-            const scannedText = result.data.text.trim();
-            if (scannedText) {
-                searchInput.value = scannedText; // помещаем текст в инпут для наглядности
-                statusDiv.textContent = `Распознано: "${scannedText}". Ищем в таблице...`;
-                searchInGoogleSheets(scannedText);
-            } else {
-                statusDiv.textContent = 'Текст не найден. Попробуйте еще раз или введите вручную.';
-            }
-        } catch (error) {
-            console.error(error);
-            statusDiv.textContent = 'Ошибка при распознавании текста.';
-        }
-    });
-
-    // 3. Логика ручного поиска
-    searchBtn.addEventListener('click', () => {
-        const query = searchInput.value.trim();
-        if (query) {
-            statusDiv.textContent = `Ищем "${query}" в таблице...`;
-            searchInGoogleSheets(query);
-        } else {
-            statusDiv.textContent = 'Пожалуйста, введите текст для поиска.';
-        }
-    });
-
-    // 4. Отправка запроса в Google Таблицы
-    async function searchInGoogleSheets(text) {
-        if (WEB_APP_URL.includes('УКАЖИТЕ_ЗДЕСЬ_ВАШ_URL')) {
-            statusDiv.textContent = 'Ошибка: Не настроен URL скрипта Google Таблиц.';
-            return;
-        }
-
-        try {
-            // Отправляем GET-запрос к Google Apps Script
-            const response = await fetch(`${WEB_APP_URL}?query=${encodeURIComponent(text)}`);
-            const data = await response.json();
-
-            if (data.success && data.results.length > 0) {
-                statusDiv.textContent = `Найдено совпадений: ${data.results.length}`;
-                resultsDiv.style.display = 'block';
-                resultsDiv.innerHTML = '<h3>Результаты поиска:</h3>' + 
-                    data.results.map(row => `<p><strong>Строка:</strong> ${row.join(', ')}</p>`).join('');
-            } else {
-                statusDiv.textContent = 'Совпадений в таблице не найдено.';
-                resultsDiv.style.display = 'none';
-            }
-        } catch (error) {
-            console.error(error);
-            statusDiv.textContent = 'Ошибка сети или таблицы при поиске.';
+            outputDiv.textContent = "✅ Модуль готов. Нажмите 'Включить камеру' или введите цифры вручную.";
+        } catch (err) {
+            outputDiv.textContent = "❌ Ошибка загрузки распознавания: " + err.message;
         }
     }
+
+    // Хранилище таблиц
+    function loadTablesFromStorage() {
+        const stored = localStorage.getItem('webScannerTables');
+        if (stored) {
+            try { tables = JSON.parse(stored); } catch(e) { tables = []; }
+        }
+        renderTableList();
+        reloadAllTablesData();
+    }
+
+    function saveTablesToStorage() {
+        localStorage.setItem('webScannerTables', JSON.stringify(tables));
+    }
+
+    function renderTableList() {
+        tableListEl.innerHTML = '';
+        tables.forEach((url, index) => {
+            const li = document.createElement('li');
+            li.textContent = url.length > 35 ? url.substring(0, 35) + "..." : url;
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Удалить';
+            removeBtn.onclick = () => {
+                tables.splice(index, 1);
+                saveTablesToStorage();
+                renderTableList();
+                reloadAllTablesData();
+            };
+            li.appendChild(removeBtn);
+            tableListEl.appendChild(li);
+        });
+    }
+
+    async function fetchTableCSV(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Ошибка сети');
+        const text = await response.text();
+        const rows = text.trim().split('\n');
+        const data = {};
+        
+        rows.forEach(row => {
+            const cols = row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
+            if (cols.length > 0 && cols[0]) {
+                const cleanKey = cols[0].replace(/\D/g, ''); 
+                if (cleanKey) data[cleanKey] = cols;    
+            }
+        });
+        return data;
+    }
+
+    async function reloadAllTablesData() {
+        tableData = {};
+        if (tables.length === 0) return;
+        
+        let loadedCount = 0;
+        for (const url of tables) {
+            try {
+                const newData = await fetchTableCSV(url);
+                Object.assign(tableData, newData);
+                loadedCount++;
+            } catch (error) {
+                console.error('Ошибка загрузки:', url, error);
+            }
+        }
+    }
+
+    addTableBtn.addEventListener('click', () => {
+        const url = tableUrlInput.value.trim();
+        if (!url) return;
+        if (!tables.includes(url)) {
+            tables.push(url);
+            saveTablesToStorage();
+            renderTableList();
+            reloadAllTablesData();
+        }
+        tableUrlInput.value = '';
+    });
+
+    // Поиск по коду
+    function processCode(code) {
+        const cleanCode = code.replace(/\D/g, '');
+        if (!cleanCode || cleanCode.length < 3) return; // Игнорируем шумы короче 3 цифр
+        
+        // Предотвращаем спам одним и тем же кодом при сканировании
+        if (cleanCode === lastFoundCode) return;
+        lastFoundCode = cleanCode;
+
+        if (tableData[cleanCode]) {
+            const row = tableData[cleanCode];
+            const info = row.slice(1).join(', ');
+            outputDiv.textContent = `🔢 Считано: ${cleanCode}\n✅ Найдено: ${info}`;
+        } else {
+            outputDiv.textContent = `🔢 Считано: ${cleanCode}\n❌ В базе не найдено.`;
+        }
+        
+        // Сбрасываем фильтр анти-спама через 3 секунды
+        setTimeout(() => { lastFoundCode = null; }, 3000);
+    }
+
+    // Ручной ввод
+    checkManualCodeBtn.addEventListener('click', () => {
+        const code = manualCodeInput.value.trim();
+        if (!code) {
+            outputDiv.textContent = "Введите цифры для поиска.";
+            return;
+        }
+        processCode(code);
+        manualCodeInput.value = '';
+    });
+
+    manualCodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') checkManualCodeBtn.click();
+    });
+
+    // Управление камерой
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        isScanning = false;
+        startScannerBtn.textContent = '▶️ Включить камеру';
+        startScannerBtn.style.backgroundColor = '#e67e22';
+        outputDiv.textContent = "Камера остановлена.";
+    }
+
+    async function startCamera() {
+        if (stream) stopCamera();
+
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            video.srcObject = stream;
+            isScanning = true;
+            startScannerBtn.textContent = '⏹ Остановить камеру';
+            startScannerBtn.style.backgroundColor = '#e74c3c';
+            outputDiv.textContent = "Камера работает. Поместите цифры строго в зеленую рамку.";
+            
+            requestAnimationFrame(scanFrameLoop);
+        } catch (err) {
+            outputDiv.textContent = "Ошибка доступа к камере: " + err.message;
+        }
+    }
+
+    startScannerBtn.addEventListener('click', () => {
+        if (isScanning) {
+            stopCamera();
+        } else {
+            startCamera();
+        }
+    });
+
+    toggleCameraBtn.addEventListener('click', () => {
+        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+        if (isScanning) startCamera();
+    });
+
+    // Цикл распознавания
+    async function scanFrameLoop() {
+        if (!isScanning || !tesseractWorker) return;
+
+        // Проверяем, что видео реально прогрузилось и имеет размеры
+        if (video.readyState === video.HAVE_ENOUGH_DATA && video.clientHeight > 0) {
+            const ctx = canvasHidden.getContext('2d');
+            
+            const vWidth = video.videoWidth;
+            const vHeight = video.videoHeight;
+
+            // Вырезаем кусок строго из зеленой рамки
+            const cropWidth = vWidth * 0.7;
+            const cropHeight = vHeight * (60 / video.clientHeight);
+            const cropX = (vWidth - cropWidth) / 2;
+            const cropY = (vHeight - cropHeight) / 2;
+
+            canvasHidden.width = cropWidth;
+            canvasHidden.height = cropHeight;
+
+            ctx.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            try {
+                const { data: { text } } = await tesseractWorker.recognize(canvasHidden);
+                const digits = text.replace(/\D/g, ''); 
+
+                if (digits.length >= 3) {
+                    processCode(digits);
+                }
+            } catch (e) {
+                console.error("Ошибка OCR:", e);
+            }
+        }
+
+        // Сканируем примерно раз в 1 секунду, чтобы не сжечь процессор телефона
+        setTimeout(() => {
+            if (isScanning) requestAnimationFrame(scanFrameLoop);
+        }, 1000);
+    }
+
+    // Старт
+    initTesseract().then(() => {
+        loadTablesFromStorage();
+    });
 </script>
 
 </body>
