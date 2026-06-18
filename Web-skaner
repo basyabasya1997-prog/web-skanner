@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Веб-сканер с Google Таблицами</title>
+    <title>Веб-сканер цифр (OCR)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,20 +23,35 @@
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             text-align: center;
+            box-sizing: border-box;
         }
-        #interactive.viewport {
+        h1 { font-size: 24px; margin-top: 0; }
+        .video-container {
             position: relative;
             width: 100%;
-            height: 300px;
+            height: 320px;
             background: #000;
             border-radius: 6px;
             overflow: hidden;
             margin: 20px 0;
         }
-        #interactive.viewport video, canvas {
+        #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        /* Рамка прицела для цифр */
+        .scan-region {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 60px;
+            border: 3px solid #2ecc71;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); /* Затемнение фона вокруг рамки */
+            border-radius: 4px;
+            pointer-events: none;
         }
         #output {
             margin-top: 20px;
@@ -47,34 +62,49 @@
             font-family: monospace;
             white-space: pre-wrap;
             text-align: left;
+            min-height: 60px;
             max-height: 150px;
             overflow-y: auto;
         }
-        .table-manager {
+        .section-box {
             margin: 15px 0;
             text-align: left;
             background: #f8f9fa;
-            padding: 10px;
+            padding: 15px;
             border-radius: 6px;
+            border: 1px solid #e2e8f0;
         }
-        .table-manager input {
-            width: 80%;
-            padding: 8px;
-            margin-right: 5px;
+        .input-group {
+            display: flex;
+            margin-top: 8px;
+        }
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px 0 0 4px;
+            font-size: 14px;
+        }
+        .input-group button {
+            border-radius: 0 4px 4px 0;
+            margin: 0;
+            padding: 10px 15px;
         }
         .table-list {
             list-style: none;
             padding: 0;
+            margin: 8px 0 0 0;
         }
         .table-list li {
             background: #e9ecef;
             margin: 4px 0;
-            padding: 6px 10px;
+            padding: 8px 10px;
             border-radius: 4px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             word-break: break-all;
+            font-size: 13px;
         }
         .table-list li button {
             background: #e74c3c;
@@ -83,92 +113,124 @@
             padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
+            margin: 0;
         }
         button {
             background-color: #3498db;
             color: white;
             border: none;
-            padding: 12px 24px;
-            font-size: 16px;
+            padding: 12px 20px;
+            font-size: 15px;
             border-radius: 4px;
             cursor: pointer;
             margin: 5px;
             transition: background 0.3s;
+            font-weight: bold;
         }
         button:hover {
-            background-color: #2980b9;
+            opacity: 0.9;
         }
         .camera-select {
             margin: 10px 0;
         }
+        #canvasHidden {
+            display: none;
+        }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
 <div class="container">
-    <h1>Сканер + Google Таблицы</h1>
+    <h1>Сканер ЦИФР + Таблицы</h1>
 
-    <!-- Управление таблицами -->
-    <div class="table-manager">
-        <h4>📋 Google Таблицы (CSV)</h4>
-        <input type="text" id="tableUrlInput" placeholder="Вставьте URL опубликованной CSV-таблицы">
-        <button id="addTableBtn">➕ Добавить</button>
+    <div class="section-box">
+        <label style="font-weight: bold;">📋 База Google Таблиц (CSV):</label>
+        <div class="input-group">
+            <input type="text" id="tableUrlInput" placeholder="Вставьте URL CSV-таблицы">
+            <button id="addTableBtn">➕ Добавить</button>
+        </div>
         <ul id="tableList" class="table-list"></ul>
-        <small>Данные загружаются автоматически при добавлении и хранятся локально.</small>
     </div>
 
-    <!-- Выбор камеры -->
+    <div class="section-box">
+        <label style="font-weight: bold;">✍️ Ввести цифры вручную:</label>
+        <div class="input-group">
+            <input type="number" id="manualCodeInput" placeholder="Введите цифры">
+            <button id="checkManualCodeBtn" style="background-color: #2ecc71;">🔍 Найти</button>
+        </div>
+    </div>
+
     <div class="camera-select">
-        <button id="toggleCamera">📷 Переключить камеру</button>
+        <button id="toggleCamera">📷 Сменить камеру</button>
+        <button id="startScannerBtn" style="background-color: #e67e22;">▶️ Включить камеру</button>
     </div>
 
-    <!-- Сканер -->
-    <button id="startScannerBtn">▶️ Включить сканер</button>
-    <div id="interactive" class="viewport"></div>
+    <div class="video-container">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="scan-region"></div>
+    </div>
 
-    <h3>Результат:</h3>
-    <div id="output">Ожидание сканирования...</div>
+    <canvas id="canvasHidden"></canvas>
+
+    <h3 style="margin-bottom: 5px;">Результат:</h3>
+    <div id="output">Загрузка модуля распознавания (потребуется пара секунд)...</div>
 </div>
 
 <script>
-    // Состояния
-    let quaggaInitialized = false;
-    let currentFacingMode = "environment"; // задняя по умолчанию
-    let tables = []; // массив URL таблиц
-    let tableData = {}; // объект: ключ – штрихкод, значение – массив ячеек строки
+    let stream = null;
+    let currentFacingMode = "environment"; 
+    let tables = []; 
+    let tableData = {}; 
+    let isScanning = false;
+    let tesseractWorker = null;
+    let lastFoundCode = null; // Чтобы не выводить одно и то же каждую секунду
 
-    // DOM элементы
+    const video = document.getElementById('video');
+    const canvasHidden = document.getElementById('canvasHidden');
     const outputDiv = document.getElementById('output');
     const tableUrlInput = document.getElementById('tableUrlInput');
     const addTableBtn = document.getElementById('addTableBtn');
     const tableListEl = document.getElementById('tableList');
     const toggleCameraBtn = document.getElementById('toggleCamera');
     const startScannerBtn = document.getElementById('startScannerBtn');
+    const manualCodeInput = document.getElementById('manualCodeInput');
+    const checkManualCodeBtn = document.getElementById('checkManualCodeBtn');
 
-    // Загружаем сохранённые таблицы из localStorage
+    // Инициализация Tesseract
+    async function initTesseract() {
+        try {
+            tesseractWorker = await Tesseract.createWorker('eng');
+            await tesseractWorker.setParameters({
+                tessedit_char_whitelist: '0123456789',
+            });
+            outputDiv.textContent = "✅ Модуль готов. Нажмите 'Включить камеру' или введите цифры вручную.";
+        } catch (err) {
+            outputDiv.textContent = "❌ Ошибка загрузки распознавания: " + err.message;
+        }
+    }
+
+    // Хранилище таблиц
     function loadTablesFromStorage() {
         const stored = localStorage.getItem('webScannerTables');
         if (stored) {
-            tables = JSON.parse(stored);
+            try { tables = JSON.parse(stored); } catch(e) { tables = []; }
         }
         renderTableList();
-        reloadAllTablesData(); // перезагрузить данные из всех таблиц
+        reloadAllTablesData();
     }
 
-    // Сохраняем список таблиц
     function saveTablesToStorage() {
         localStorage.setItem('webScannerTables', JSON.stringify(tables));
     }
 
-    // Отображение списка таблиц
     function renderTableList() {
         tableListEl.innerHTML = '';
         tables.forEach((url, index) => {
             const li = document.createElement('li');
-            li.textContent = url;
+            li.textContent = url.length > 35 ? url.substring(0, 35) + "..." : url;
             const removeBtn = document.createElement('button');
-            removeBtn.textContent = '❌';
+            removeBtn.textContent = 'Удалить';
             removeBtn.onclick = () => {
                 tables.splice(index, 1);
                 saveTablesToStorage();
@@ -180,38 +242,39 @@
         });
     }
 
-    // Загрузка CSV из URL и парсинг
     async function fetchTableCSV(url) {
         const response = await fetch(url);
+        if (!response.ok) throw new Error('Ошибка сети');
         const text = await response.text();
         const rows = text.trim().split('\n');
         const data = {};
+        
         rows.forEach(row => {
-            // Простой парсинг CSV (без экранирования кавычек – для простых данных)
-            const cols = row.split(',').map(cell => cell.trim());
-            if (cols.length > 0) {
-                const barcode = cols[0]; // первый столбец – штрихкод
-                data[barcode] = cols;    // сохраняем всю строку
+            const cols = row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
+            if (cols.length > 0 && cols[0]) {
+                const cleanKey = cols[0].replace(/\D/g, ''); 
+                if (cleanKey) data[cleanKey] = cols;    
             }
         });
         return data;
     }
 
-    // Объединяем данные из всех таблиц (приоритет последней добавленной)
     async function reloadAllTablesData() {
         tableData = {};
+        if (tables.length === 0) return;
+        
+        let loadedCount = 0;
         for (const url of tables) {
             try {
                 const newData = await fetchTableCSV(url);
-                Object.assign(tableData, newData); // перезаписываем дубликаты последними
+                Object.assign(tableData, newData);
+                loadedCount++;
             } catch (error) {
-                console.error('Ошибка загрузки таблицы:', url, error);
+                console.error('Ошибка загрузки:', url, error);
             }
         }
-        outputDiv.textContent = `Загружено таблиц: ${tables.length}. Штрихкодов в базе: ${Object.keys(tableData).length}`;
     }
 
-    // Добавление новой таблицы
     addTableBtn.addEventListener('click', () => {
         const url = tableUrlInput.value.trim();
         if (!url) return;
@@ -224,141 +287,130 @@
         tableUrlInput.value = '';
     });
 
-    // Остановка Quagga, если запущен
-    function stopQuagga() {
-        if (quaggaInitialized) {
-            Quagga.stop();
-            quaggaInitialized = false;
+    // Поиск по коду
+    function processCode(code) {
+        const cleanCode = code.replace(/\D/g, '');
+        if (!cleanCode || cleanCode.length < 3) return; // Игнорируем шумы короче 3 цифр
+        
+        // Предотвращаем спам одним и тем же кодом при сканировании
+        if (cleanCode === lastFoundCode) return;
+        lastFoundCode = cleanCode;
+
+        if (tableData[cleanCode]) {
+            const row = tableData[cleanCode];
+            const info = row.slice(1).join(', ');
+            outputDiv.textContent = `🔢 Считано: ${cleanCode}\n✅ Найдено: ${info}`;
+        } else {
+            outputDiv.textContent = `🔢 Считано: ${cleanCode}\n❌ В базе не найдено.`;
+        }
+        
+        // Сбрасываем фильтр анти-спама через 3 секунды
+        setTimeout(() => { lastFoundCode = null; }, 3000);
+    }
+
+    // Ручной ввод
+    checkManualCodeBtn.addEventListener('click', () => {
+        const code = manualCodeInput.value.trim();
+        if (!code) {
+            outputDiv.textContent = "Введите цифры для поиска.";
+            return;
+        }
+        processCode(code);
+        manualCodeInput.value = '';
+    });
+
+    manualCodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') checkManualCodeBtn.click();
+    });
+
+    // Управление камерой
+    function stopCamera() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        isScanning = false;
+        startScannerBtn.textContent = '▶️ Включить камеру';
+        startScannerBtn.style.backgroundColor = '#e67e22';
+        outputDiv.textContent = "Камера остановлена.";
+    }
+
+    async function startCamera() {
+        if (stream) stopCamera();
+
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            video.srcObject = stream;
+            isScanning = true;
+            startScannerBtn.textContent = '⏹ Остановить камеру';
+            startScannerBtn.style.backgroundColor = '#e74c3c';
+            outputDiv.textContent = "Камера работает. Поместите цифры строго в зеленую рамку.";
+            
+            requestAnimationFrame(scanFrameLoop);
+        } catch (err) {
+            outputDiv.textContent = "Ошибка доступа к камере: " + err.message;
         }
     }
 
-    // Запуск/перезапуск сканера с заданной камерой
-    function startScanner() {
-        stopQuagga();
-        outputDiv.textContent = "Инициализация камеры...";
-
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.querySelector('#interactive'),
-                constraints: {
-                    width: 640,
-                    height: 480,
-                    facingMode: currentFacingMode
-                }
-            },
-            decoder: {
-                readers: ["ean_reader", "ean_8_reader", "code_128_reader"]
-            }
-        }, function (err) {
-            if (err) {
-                console.error(err);
-                outputDiv.textContent = "Ошибка запуска: " + err.message;
-                return;
-            }
-            quaggaInitialized = true;
-            Quagga.start();
-            outputDiv.textContent = "Сканер запущен. Наведите на штрихкод.";
-        });
-
-        // Обработка распознавания
-        Quagga.onDetected(function (data) {
-            const code = data.codeResult.code;
-            outputDiv.textContent = `Распознан код: ${code}`;
-
-            // Поиск в загруженных данных таблиц
-            if (tableData[code]) {
-                const row = tableData[code];
-                // выводим всю строку, кроме первого столбца (штрихкода)
-                const info = row.slice(1).join(', ');
-                outputDiv.textContent = `✅ Найдено: ${info}`;
-                // Можно добавить звуковой сигнал или вибрацию
-            } else {
-                outputDiv.textContent = `❌ Штрихкод "${code}" не найден в загруженных таблицах.`;
-            }
-        });
-    }
-
-    // Переключение камеры
-    toggleCameraBtn.addEventListener('click', () => {
-        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-        if (quaggaInitialized) {
-            startScanner(); // перезапуск с новой камерой
+    startScannerBtn.addEventListener('click', () => {
+        if (isScanning) {
+            stopCamera();
+        } else {
+            startCamera();
         }
     });
 
-    // Кнопка запуска
-    startScannerBtn.addEventListener('click', startScanner);
+    toggleCameraBtn.addEventListener('click', () => {
+        currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+        if (isScanning) startCamera();
+    });
 
-    // Инициализация при загрузке страницы
-    loadTablesFromStorage();
-</script>
-</body>
-</html>    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-</head>
-<body>
+    // Цикл распознавания
+    async function scanFrameLoop() {
+        if (!isScanning || !tesseractWorker) return;
 
-<div class="container">
-    <h1>Сканер штрихкодов</h1>
-    <button onclick="startScanner()">Включить сканер</button>
-    
-    <div id="interactive" class="viewport"></div>
-
-    <h3>Результат сканирования:</h3>
-    <div id="output">Нажмите кнопку для запуска сканера...</div>
-</div>
-
-<script>
-    function startScanner() {
-        const outputDiv = document.getElementById('output');
-        outputDiv.textContent = "Инициализация камеры...";
-
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.querySelector('#interactive'),
-                constraints: {
-                    width: 640,
-                    height: 480,
-                    facingMode: "environment" // Задняя камера
-                },
-            },
-            decoder: {
-                readers: ["ean_reader", "ean_8_reader", "code_128_reader"] // Форматы штрихкодов
-            }
-        }, function (err) {
-            if (err) {
-                console.error(err);
-                outputDiv.textContent = "Ошибка запуска: " + err.message;
-                return;
-            }
-            console.log("Initialization finished. Ready to start");
-            Quagga.start();
-            outputDiv.textContent = "Сканер запущен. Наведите камеру на штрихкод.";
-        });
-
-        // Логика обработки распознанного штрихкода из вашего коммита
-        Quagga.onDetected(function (data) {
-            const code = data.codeResult.code;
-            document.getElementById('output').textContent = "Распознан код: " + code;
+        // Проверяем, что видео реально прогрузилось и имеет размеры
+        if (video.readyState === video.HAVE_ENOUGH_DATA && video.clientHeight > 0) {
+            const ctx = canvasHidden.getContext('2d');
             
-            // Проверка условий из оригинального скрипта
-            if (code.startsWith("460")) {
-                alert("Это Молоко Домик в деревне!");
-            } else if (code.startsWith("467")) {
-                alert("Это Сыр Ламбер!");
-            } else if (code === "4600605021571") {
-                alert("Это Шоколад Аленка!");
-            } else if (code === "4640001150111") {
-                alert("Это Сок Добрый Яблоко!");
-            } else {
-                console.log("Неизвестный штрихкод: " + code);
+            const vWidth = video.videoWidth;
+            const vHeight = video.videoHeight;
+
+            // Вырезаем кусок строго из зеленой рамки
+            const cropWidth = vWidth * 0.7;
+            const cropHeight = vHeight * (60 / video.clientHeight);
+            const cropX = (vWidth - cropWidth) / 2;
+            const cropY = (vHeight - cropHeight) / 2;
+
+            canvasHidden.width = cropWidth;
+            canvasHidden.height = cropHeight;
+
+            ctx.drawImage(video, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            try {
+                const { data: { text } } = await tesseractWorker.recognize(canvasHidden);
+                const digits = text.replace(/\D/g, ''); 
+
+                if (digits.length >= 3) {
+                    processCode(digits);
+                }
+            } catch (e) {
+                console.error("Ошибка OCR:", e);
             }
-        });
+        }
+
+        // Сканируем примерно раз в 1 секунду, чтобы не сжечь процессор телефона
+        setTimeout(() => {
+            if (isScanning) requestAnimationFrame(scanFrameLoop);
+        }, 1000);
     }
+
+    // Старт
+    initTesseract().then(() => {
+        loadTablesFromStorage();
+    });
 </script>
 
 </body>
